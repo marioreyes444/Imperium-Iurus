@@ -424,3 +424,48 @@ El servidor MCP `noodles` (`pip install noodles`, tools `mcp__noodles__*`) gener
 - **Publicado:** https://fascinating-dasik-c50921.netlify.app/ — snapshot del análisis `ce4824ca73e8` (2026-07-06). Al ser un snapshot estático, no se actualiza solo; si el código cambia mucho, regenerar con `analyze_local_repo` y volver a publicar.
 - **No sirve como Artifact de Claude** — el CSP del sandbox de Artifacts bloquea scripts de CDN externos, así que Mermaid no cargaría y el diagrama quedaría en blanco.
 - Si se quiere el visor con servidor local en vez del archivo suelto: `noodles viewer <result_dir> --port <N>` (el ejecutable puede no estar en el PATH si se instaló como paquete de usuario — buscar `noodles.exe` en la carpeta `Scripts` del `site-packages` de Python).
+
+---
+
+## CRM (módulo E6) — Entrega 1: cimientos
+
+Especificación fuente de verdad: `docs/crm/ESPECIFICACION_CRM_E6.md`. Vive en `/admin/crm`.
+Las migraciones M4/M5 (`supabase/migrations/`) las aplica una persona autorizada: el código nunca ejecuta SQL.
+
+| Pieza | Dónde |
+|-------|-------|
+| Roles (`direccion`, `coordinacion`, `asistencia`, `asociado`, `externo`) y espejo en `app_metadata.role` (Dirección = `admin`) | `lib/crm/roles.ts` (puro, usable en el middleware) |
+| Capa de permisos: `getPersonal`, `autorizarApi`, `personalDePagina`, `puedeVerSolicitud`, matriz `ACCIONES` | `lib/crm/permisos.ts` — **único lugar** donde se decide quién puede qué |
+| Errores de la base → HTTP (`CRM-Rxx`, 23505, 23514…) | `lib/crm/errores.ts` |
+| Esquemas Zod, normalización, bitácora | `lib/crm/schemas.ts`, `normalizar.ts`, `bitacora.ts` |
+| API | `app/api/admin/crm/**` (yo, usuarios, bitacora, catalogo, tablero) |
+| Páginas | `app/admin/crm/(panel)/**`; el armazón (`CrmNav` + `CrmTopBar`) está en `(panel)/layout.tsx` |
+| Componentes | `components/crm/**` (`ListaSeleccionable`, `PanelAccion`, `Franja`, `Indicador`) |
+
+Convenciones:
+- Toda ruta/página del CRM: sesión (401) → ficha activa en `crm_personal` (403) → rol (403) → Zod (400). La ficha se lee en cada petición, así que desactivar a alguien surte efecto de inmediato.
+- Las tablas `crm_*` solo se tocan con `service_role` desde el servidor; ningún archivo de `lib/crm` se importa desde componentes cliente (salvo `import type`).
+- Sin modales ni `window.confirm`: formularios largos en página propia, acciones cortas con `PanelAccion`.
+- Listados con carga progresiva (`?cursor=…&limite=30` → `{ items, siguienteCursor, total }`).
+- `PATCH` con control de edición simultánea (`updated_at`) → 409 si cambió.
+- Pendiente: invitación por correo (`lib/crm/invitaciones.ts`) y catálogo E5 (`lib/crm/catalogo.ts` devuelve listas vacías mientras no exista).
+
+### Entrega 2 — Captación (contactos, duplicados, solicitudes)
+
+| Pieza | Dónde |
+|-------|-------|
+| Visibilidad EN la consulta (casos y contactos; reserva reforzada) | `lib/crm/visibilidad.ts` (`alcancesDe`, `aplicarAlcance`) |
+| Estados de una solicitud (R-12, quién puede cada cambio, `cambiarEstado`) | `lib/crm/estados.ts` — única vía manual para cambiar el estado |
+| Etapa de relación del contacto | `lib/crm/etapas.ts` |
+| Cédula y RUC (RUC con dígito que no cuadra se acepta como «no validado») | `lib/crm/identificacion.ts` |
+| Posibles duplicados (R-04) | `lib/crm/duplicados.ts` |
+| Ingreso automático desde web/citas (nunca lanza) | `lib/crm/ingesta.ts` (`registrarEntrada`, `registrarEntradaSegura`) |
+| Criterios de «envío sospechoso» (solo marcan, nunca bloquean) | `lib/crm/sospecha.ts` |
+| Avisos R-16 (panel + push al panel admin; el correo va en la Entrega 4) | `lib/crm/avisos.ts` |
+
+Convenciones:
+- Entidades de la bitácora = nombre de la tabla (`crm_solicitudes`, `crm_contactos`, `crm_personal`…), igual que las funciones de la base.
+- Un contacto con `reserva_reforzada` solo lo ve Dirección y quien esté ACTIVO en el equipo de algún caso suyo; sus solicitudes nacen reservadas; quien ve la solicitud pero no el contacto ve «Contacto reservado». Búsquedas, listados, conteos y avisos lo respetan.
+- Los formularios web guardan el nombre completo en `nombres` (`apellidos = null`); la ficha muestra «Completar apellidos».
+- `primera_respuesta_at` se fija una sola vez (`marcarPrimeraRespuesta`): al salir de «nueva» o con una actividad de contacto (la ruta de actividades es de la Entrega 4).
+- Pendiente: push personal (E7), correo de avisos (Entrega 4), invitación por correo de usuarios, catálogo E5 en DEV.

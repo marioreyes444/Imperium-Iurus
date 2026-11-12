@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
-import { CalendarDays, LayoutDashboard, LogOut, MessageCircle, PencilLine, Shield, User } from 'lucide-react'
+import { Briefcase, CalendarDays, LayoutDashboard, LogOut, MessageCircle, PencilLine, Shield, User } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { useEditMode } from '@/components/providers/EditModeProvider'
 
@@ -13,7 +13,7 @@ export default function NavAuthButton({ mobile = false }: { mobile?: boolean }) 
   const router      = useRouter()
   const supabase    = createSupabaseBrowserClient()
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const { isAdmin, editMode, toggleEditMode } = useEditMode()
+  const { isAdmin, rolCrm, editMode, toggleEditMode } = useEditMode()
 
   // undefined = cargando | null = no logueado | User = logueado
   const [user, setUser] = useState<SupabaseUser | null | undefined>(undefined)
@@ -122,6 +122,15 @@ export default function NavAuthButton({ mobile = false }: { mobile?: boolean }) 
               Seguridad (2FA)
             </Link>
           )}
+          {rolCrm && (
+            <Link
+              href="/admin/crm"
+              className="flex items-center gap-2 font-montserrat text-xs font-medium uppercase tracking-widest text-gold/80 transition-colors hover:text-gold"
+            >
+              <Briefcase size={14} />
+              CRM
+            </Link>
+          )}
           {isAdmin && (
             <>
               <Link
@@ -209,6 +218,17 @@ export default function NavAuthButton({ mobile = false }: { mobile?: boolean }) 
             >
               <Shield size={14} />
               Seguridad (2FA)
+            </Link>
+          )}
+          {rolCrm && (
+            <Link
+              href="/admin/crm"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-4 py-3 font-montserrat text-xs uppercase tracking-widest text-gold/90 transition-colors hover:bg-gold/10 hover:text-gold"
+            >
+              <Briefcase size={14} />
+              CRM
             </Link>
           )}
           {isAdmin && (

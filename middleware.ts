@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isAdminUser } from '@/lib/admin-auth'
+import { rolCrmDesdeUsuario } from '@/lib/crm/roles'
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -32,14 +33,22 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith('/admin')) {
     const isLoginPage = pathname === '/admin/login'
     const isAdmin = isAdminUser(user)
+    // Personal del CRM (coordinación, asistencia, asociado, externo): solo /admin/crm/**.
+    // Dirección equivale a admin y conserva acceso a todo /admin.
+    const rolCrm = rolCrmDesdeUsuario(user)
+    const esPersonalCrm = rolCrm !== null && !isAdmin
+    const isCrmRoute = pathname === '/admin/crm' || pathname.startsWith('/admin/crm/')
 
-    if (!isAdmin && !isLoginPage) {
+    if (!isAdmin && !esPersonalCrm && !isLoginPage) {
       const url = new URL('/admin/login', request.url)
       url.searchParams.set('redirect', pathname)
       return NextResponse.redirect(url)
     }
     if (isAdmin && isLoginPage) {
       return NextResponse.redirect(new URL('/admin/agenda', request.url))
+    }
+    if (esPersonalCrm && (isLoginPage || !isCrmRoute)) {
+      return NextResponse.redirect(new URL('/admin/crm', request.url))
     }
     return supabaseResponse
   }

@@ -10,6 +10,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return <div className="min-h-screen bg-primary">{children}</div>
   }
 
+  // El CRM trae su propio armazón (CrmNav + CrmTopBar) en app/admin/crm/(panel)/layout.tsx.
+  if (pathname === '/admin/crm' || pathname.startsWith('/admin/crm/')) {
+    return <>{children}</>
+  }
+
   return (
     <div className="flex min-h-screen bg-primary">
       <AdminNav />

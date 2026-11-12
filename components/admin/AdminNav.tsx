@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { CalendarDays, ExternalLink, LogOut, MessageCircle, MessageSquare, Newspaper, Settings, Star } from 'lucide-react'
+import { Briefcase, CalendarDays, ExternalLink, LogOut, MessageCircle, MessageSquare, Newspaper, Settings, Star } from 'lucide-react'
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
 import PushNotificationToggle from '@/components/admin/PushNotificationToggle'
 
 const NAV = [
+  { href: '/admin/crm',           label: 'CRM',           icon: Briefcase },
   { href: '/admin/agenda',        label: 'Agenda',        icon: CalendarDays },
   { href: '/admin/contacto',      label: 'Consultas',     icon: MessageSquare },
   { href: '/admin/chats',         label: 'Chats',         icon: MessageCircle },

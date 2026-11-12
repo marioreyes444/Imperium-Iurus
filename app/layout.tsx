@@ -9,6 +9,7 @@ import MotionProvider from '@/components/providers/MotionProvider'
 import { getSiteConfig } from '@/lib/config'
 import { getUser } from '@/lib/supabase-server'
 import { isAdminUser } from '@/lib/admin-auth'
+import { rolCrmDesdeUsuario } from '@/lib/crm/roles'
 import { BRAND } from '@/lib/constants'
 import { SITE_URL } from '@/lib/site'
 
@@ -110,6 +111,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 
   const user = await getUser()
   const isAdmin = isAdminUser(user)
+  // Solo viaja el rol del CRM (o null) al cliente, nunca otros datos de la sesión.
+  const rolCrm = rolCrmDesdeUsuario(user)
 
   const openDays = horario_atencion.dias.map((d: number) => DAYS_EN[d])
 
@@ -150,7 +153,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           }}
         />
         <ConfigProvider config={config}>
-          <EditModeProvider isAdmin={isAdmin}>
+          <EditModeProvider isAdmin={isAdmin} rolCrm={rolCrm}>
             <MotionProvider>
               <PublicShell>{children}</PublicShell>
             </MotionProvider>
