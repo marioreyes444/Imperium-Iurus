@@ -1,9 +1,10 @@
-import { type NextRequest, NextResponse } from 'next/server'
+import { after, type NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { contactSchema, type ApiResponse, type ContactFormData } from '@/lib/schemas'
 import { supabase } from '@/lib/supabase'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import { sendPushToAdmin } from '@/lib/push'
+import { registrarEntradaSegura } from '@/lib/crm/ingesta'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
   }
 
   // Guardar consulta en Supabase
-  const { error: dbError } = await supabase.from('consultas').insert({
+  const { data: consulta, error: dbError } = await supabase.from('consultas').insert({
     nombre:        data.nombre,
     correo:        data.correo,
     telefono:      data.telefono,
@@ -134,8 +135,21 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     mensaje:       data.mensaje,
     confidencial:  data.confidencial,
     estado:        'nuevo',
-  })
+  }).select('id').single()
   if (dbError) console.error('[contact] Supabase error:', dbError.message)
+
+  // CRM (E6): después de guardar y sin bloquear la respuesta. Si falla o las tablas del CRM no
+  // existen, solo queda una línea en el log (sin datos personales) y el formulario responde igual.
+  if (consulta?.id) {
+    after(() => registrarEntradaSegura('contact', () => ({
+      canal: 'web' as const,
+      origen: { tabla: 'consultas' as const, id: consulta.id as string },
+      contacto: { nombres: data.nombre, correo: data.correo, telefono: data.telefono },
+      descripcion: data.mensaje,
+      urgencia: data.tipoConsulta === 'urgencia' ? ('alta' as const) : undefined,
+      reservaReforzada: data.confidencial === true,
+    })))
+  }
 
   await sendPushToAdmin({
     title: `Nueva consulta de ${data.nombre}`,

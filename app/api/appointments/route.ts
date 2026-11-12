@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from 'next/server'
+import { after, type NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { appointmentSchema, type ApiResponse, type AppointmentFormData } from '@/lib/schemas'
 import { supabase } from '@/lib/supabase'
@@ -7,6 +7,7 @@ import { CONFIG_DEFAULTS, generateSlots, isDateAvailable } from '@/lib/config'
 import type { HorarioCitasConfig, FestivosConfig } from '@/lib/config'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import { sendPushToAdmin } from '@/lib/push'
+import { registrarEntradaSegura } from '@/lib/crm/ingesta'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -220,9 +221,23 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     .single()
 
   if (dbError || !inserted) {
+    // M5: reserva simultánea sin abogado en la misma fecha y hora (índice citas_un_turno_sin_abogado).
+    if (dbError?.code === '23505' && `${dbError.message} ${dbError.details ?? ''}`.includes('citas_un_turno_sin_abogado')) {
+      return NextResponse.json({ success: false, error: 'Este horario ya no está disponible. Por favor seleccione otro.' }, { status: 409 })
+    }
     console.error('[appointments] Supabase error:', dbError)
     return NextResponse.json({ success: false, error: 'Error al guardar la cita.' }, { status: 502 })
   }
+
+  // CRM (E6): después de guardar y sin bloquear la respuesta. Si falla o las tablas del CRM no
+  // existen, solo queda una línea en el log (sin datos personales) y la reserva responde igual.
+  after(() => registrarEntradaSegura('appointments', () => ({
+    canal: 'cita' as const,
+    origen: { tabla: 'citas' as const, id: inserted.id as string },
+    contacto: { nombres: data.nombre, correo: data.correo, telefono: data.telefono },
+    descripcion: data.mensaje?.trim() || `Cita agendada: ${TIPO_LABEL[data.tipoConsulta]} el ${data.fecha} a las ${data.hora}`,
+    urgencia: data.tipoConsulta === 'urgencia' ? ('alta' as const) : undefined,
+  })))
 
   await sendPushToAdmin({
     title: `Nueva cita de ${data.nombre}`,
