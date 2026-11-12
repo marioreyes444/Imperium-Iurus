@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maqueta CRM — Solicitudes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#0b1524; --nav:#060b12; --card:#101c2e; --border:#1f2c40;
+    --gold:#c9a84c; --text:#e8e4d8; --muted:#8c97a8; --row:#14233a;
+    --red:#e07a7a; --green:#7fc79a; --blue:#7fb0e0; --amber:#e0b35a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--primary);color:var(--text);font-family:Montserrat,system-ui,sans-serif;font-size:14px}
+  .cinzel{font-family:Cinzel,Georgia,serif}
+  .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.2em}
+  aside{position:fixed;inset:0 auto 0 0;width:224px;background:var(--nav);border-right:1px solid var(--border);display:flex;flex-direction:column}
+  .brand{padding:20px;border-bottom:1px solid var(--border);text-align:center}
+  .brand small{display:block;padding-left:.3em}
+  .brand b{padding-left:.15em}
+  .brand small{color:rgba(201,168,76,.5);letter-spacing:.3em}
+  .brand b{display:block;color:var(--gold);letter-spacing:.15em;font-size:14px;margin-top:2px}
+  nav{padding:14px 12px;flex:1;overflow:auto}
+  nav h6{margin:14px 12px 6px;color:rgba(201,168,76,.45);font-weight:500}
+  nav a{display:flex;justify-content:space-between;padding:10px 12px;border-radius:4px;color:var(--muted);text-decoration:none;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.14em}
+  nav a.on{background:rgba(201,168,76,.1);color:var(--gold)}
+  nav a:hover{color:var(--gold)}
+  nav a i{font-style:normal;background:rgba(201,168,76,.15);color:var(--gold);border-radius:99px;padding:0 7px;font-size:10px;letter-spacing:0}
+  .foot{border-top:1px solid var(--border);padding:12px}
+  main{margin-left:224px;height:100vh;display:flex;flex-direction:column}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--nav)}
+  .crumb{color:var(--muted)} .crumb b{color:var(--gold);font-weight:500}
+  .who{display:flex;align-items:center;gap:14px;text-align:right}
+  .who strong{display:block;font-weight:600;font-size:13px}
+  .who span{color:var(--gold)}
+  .avatar{width:34px;height:34px;border:1px solid var(--gold);border-radius:50%;display:grid;place-items:center;color:var(--gold);font-size:12px}
+  .wrap{padding:22px 24px 16px;flex:1;min-height:0;display:flex;flex-direction:column}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:16px;flex-wrap:wrap}
+  .head small{color:rgba(201,168,76,.5);letter-spacing:.3em}
+  h1{margin:4px 0 0;font-size:28px;color:var(--gold);letter-spacing:.08em;text-transform:uppercase}
+  button,.btn{font:inherit;cursor:pointer;background:none;color:var(--gold);border:1px solid rgba(201,168,76,.4);padding:8px 14px;font-size:10px;text-transform:uppercase;letter-spacing:.16em}
+  button:hover:not(:disabled){border-color:var(--gold);background:rgba(201,168,76,.08)}
+  button:disabled{opacity:.3;cursor:not-allowed}
+  button:focus-visible,tr:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .solid{background:var(--gold);color:#0b1524;border-color:var(--gold);font-weight:600;padding:11px 18px}
+  .solid:hover:not(:disabled){background:#d8b95e}
+  .card{background:var(--card);border:1px solid var(--border);flex:1;min-height:0;display:flex;flex-direction:column}
+  .filters{display:flex;gap:10px;padding:14px;flex-wrap:wrap}
+  input,select,textarea{font:inherit;background:var(--primary);border:1px solid var(--border);color:var(--text);padding:9px 12px}
+  input[type=search]{flex:1;min-width:220px}
+  .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:rgba(6,11,18,.5);flex-wrap:wrap}
+  .bar p{margin:0;color:var(--muted)} .bar p b{color:var(--text);font-weight:500}
+  .acts{display:flex;gap:8px;flex-wrap:wrap}
+  .panel{display:none;padding:18px 14px;border-bottom:1px solid var(--border);background:var(--row)}
+  .panel.on{display:block}
+  .panel h3{margin:0 0 12px;color:var(--gold);font-size:13px;letter-spacing:.12em;text-transform:uppercase}
+  .grid{display:grid;grid-template-columns:240px 1fr;gap:12px;max-width:760px}
+  .grid label{display:block;color:var(--muted);margin-bottom:5px}
+  .grid select,.grid textarea{width:100%}
+  .panel .acts{margin-top:14px}
+  .tbl{overflow:auto;flex:1;min-height:0}
+  thead th{position:sticky;top:0;background:var(--card);z-index:1}
+  table{width:100%;border-collapse:collapse;min-width:860px;table-layout:fixed}
+  td{overflow:hidden;text-overflow:ellipsis}
+  th{text-align:left;padding:12px 14px;color:rgba(201,168,76,.6);font-weight:500;border-bottom:1px solid var(--border)}
+  td{padding:13px 14px;border-bottom:1px solid var(--border);color:var(--text)}
+  td small{display:block;color:var(--muted);margin-top:2px}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:rgba(255,255,255,.03)}
+  tbody tr.sel{background:rgba(201,168,76,.1);box-shadow:inset 3px 0 0 var(--gold)}
+  .ind{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+  .ind::before{content:"";width:7px;height:7px;flex:none;border:1px solid var(--muted)}
+  .u-critica{color:#e9a9a2;font-weight:600} .u-critica::before{background:#c8574c;border-color:#c8574c}
+  .u-alta::before{background:var(--gold);border-color:var(--gold)}
+  .u-media::before{border-color:var(--gold)}
+  .u-ordinaria{color:var(--muted)} .u-ordinaria::before{border-color:transparent}
+  .e-ind::before{border-radius:50%}
+  .e-entrada::before{border-color:var(--text)}
+  .e-tramite::before{background:var(--gold);border-color:var(--gold)}
+  .e-activo::before{background:var(--text);border-color:var(--text)}
+  .e-fin{color:var(--muted)} .e-fin::before{border-color:transparent;background:var(--border)}
+  .t-muted{color:var(--muted)}
+  .vacio{padding:48px 14px;text-align:center;color:var(--muted)}
+  .pag{padding:10px 14px;color:var(--muted);border-top:1px solid var(--border);font-size:12px}
+  .note{margin:12px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
+  @media (max-width:820px){aside{display:none}main{margin-left:0}.note{display:none}main{height:auto;min-height:100vh;display:block}.wrap,.card{display:block}.tbl{overflow-y:visible}thead th{position:static}.grid{grid-template-columns:1fr}.crumb{display:none}}
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand cinzel"><small class="lbl">CRM</small><b>IMPERIUM IURIS</b></div>
+  <nav>
+    <a href="#">Tablero</a>
+    <h6 class="lbl">Gestión</h6>
+    <a href="#" class="on">Solicitudes <i>4</i></a>
+    <a href="#">Contactos</a>
+    <a href="#">Agenda</a>
+    <a href="#">Tareas <i>2</i></a>
+    <h6 class="lbl">Revisión</h6>
+    <a href="#">Validación <i>1</i></a>
+    <a href="#">Duplicados</a>
+    <h6 class="lbl">Estudio</h6>
+    <a href="#">Personal</a>
+    <a href="#">Reportes</a>
+  </nav>
+  <div class="foot"><nav style="padding:0"><a href="#">Ver sitio público</a></nav></div>
+</aside>
+
+<main>
+  <div class="top">
+    <div class="crumb lbl">CRM &nbsp;/&nbsp; <b>Solicitudes</b></div>
+    <div class="who">
+      <div><strong>Valeria Fernández</strong><span class="lbl">Coordinación</span></div>
+      <div class="avatar" aria-hidden="true">VF</div>
+      <button type="button">Salir</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="head">
+      <div><small class="lbl cinzel">Gestión</small><h1 class="cinzel">Solicitudes</h1></div>
+      <button type="button" class="solid">+ Nueva solicitud</button>
+    </div>
+
+    <div class="card">
+      <div class="filters">
+        <input type="search" id="q" placeholder="Buscar por código, nombre o identificación" aria-label="Buscar">
+        <select id="fe" aria-label="Estado"><option value="">Todos los estados</option></select>
+        <select id="fu" aria-label="Urgencia"><option value="">Toda urgencia</option><option>Crítica</option><option>Alta</option><option>Media</option><option>Ordinaria</option></select>
+        <select id="fa" aria-label="Área"><option value="">Todas las áreas</option></select>
+      </div>
+
+      <div class="bar">
+        <p id="sel" aria-live="polite">Ninguna solicitud seleccionada</p>
+        <div class="acts">
+          <button type="button" class="need" disabled>Ver</button>
+          <button type="button" class="need" disabled>Editar</button>
+          <button type="button" class="need" id="bEstado" disabled>Cambiar estado</button>
+        </div>
+      </div>
+
+      <div class="panel" id="panel">
+        <h3 class="cinzel">Cambiar estado — <span id="pcod"></span></h3>
+        <div class="grid">
+          <div><label class="lbl" for="ne">Nuevo estado</label>
+            <select id="ne"><option>Pendiente de información</option><option>Consulta agendada</option><option>Propuesta enviada</option><option>Descartada</option></select></div>
+          <div><label class="lbl" for="mo">Motivo (obligatorio para descartar)</label>
+            <textarea id="mo" rows="2"></textarea></div>
+        </div>
+        <div class="acts"><button type="button" class="solid">Guardar cambio</button><button type="button" id="bCancel">Cancelar</button></div>
+      </div>
+
+      <div class="tbl">
+      <table>
+        <colgroup><col style="width:11%"><col style="width:25%"><col style="width:14%"><col style="width:11%"><col style="width:19%"><col style="width:11%"><col style="width:9%"></colgroup>
+        <thead><tr class="lbl"><th>Código</th><th>Contacto</th><th>Área</th><th>Urgencia</th><th>Estado</th><th>Titular</th><th>Recibida</th></tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+      <p class="vacio" id="vacio" hidden>Ninguna solicitud coincide con la búsqueda.</p>
+      <div id="fin" aria-hidden="true" style="height:1px"></div>
+      </div>
+      <div class="pag" id="cuenta" aria-live="polite"></div>
+    </div>
+
+    <p class="note">Maqueta con 64 solicitudes ficticias. El buscador y los filtros funcionan; la lista carga más filas al desplazarse y la parte superior queda fija.</p>
+  </div>
+</main>
+
+<script>
+  // ── Datos ficticios
+  const N=['Ana Paz Ruiz','Luis Mora Vera','María León Ortiz','José Peña Ávila','Carmen Vélez Soto','Diego Núñez Cruz','Rosa Íñiguez Paz','Pedro Zambrano Gil','Lucía Córdova Mera','Andrés Quiñónez Rey'],
+        E=['ACME S.A.','Transportes del Pacífico Cía. Ltda.','Agrícola El Oro S.A.','Constructora Machala S.A.'],
+        A=['Civil','Inmobiliaria','Familia','Laboral','Penal','Tránsito','Constitucional','Tributaria','Societaria','Consumidores'],
+        U=['Ordinaria','Ordinaria','Media','Media','Alta','Crítica'],
+        ES=[['Nueva','entrada'],['En calificación','tramite'],['Pendiente de información','tramite'],['Consulta agendada','tramite'],
+            ['Propuesta enviada','tramite'],['Pendiente de asignación','tramite'],['Asignada','activo'],['En curso','activo'],
+            ['En espera','activo'],['Cerrada','fin'],['Descartada','fin']],
+        T=['Ab. J. Castro','Ab. M. Loor','Ab. P. Aguirre'];
+  const datos=[];
+  for(let i=64;i>=1;i--){
+    const emp=i%5===0, e=ES[(i*7)%ES.length];
+    datos.push({c:'S26-'+String(i).padStart(4,'0'), n:emp?E[i%E.length]:N[i%N.length],
+      id:emp?'099'+String(1000000+i*137).slice(0,7)+'001':'09'+String(10000000+i*7919).slice(0,8),
+      a:A[(i*3)%A.length], u:U[(i*5)%U.length], e:e[0], g:e[1],
+      t:['activo','fin'].includes(e[1])&&e[0]!=='Descartada'?T[i%T.length]:'', f:i>62?'Hoy':i>60?'Ayer':String((i%28)+1).padStart(2,'0')+'/10/2026'});
+  }
+  const $=id=>document.getElementById(id), norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  ES.forEach(e=>$('fe').add(new Option(e[0]))); A.forEach(a=>$('fa').add(new Option(a)));
+
+  // ── Estado de la pantalla
+  const LOTE=20; let filtrados=[], mostrados=0, elegido=null;
+  const tb=$('tb'), sel=$('sel'), need=document.querySelectorAll('.need'), panel=$('panel');
+
+  function fila(d){
+    const tr=document.createElement('tr'); tr.tabIndex=0; tr.dataset.c=d.c;
+    tr.innerHTML=`<td>${d.c}</td><td>${d.n}<small>${d.id}</small></td><td>${d.a}</td>
+      <td><span class="ind u-${norm(d.u)}">${d.u}</span></td>
+      <td><span class="ind e-ind e-${d.g}">${d.e}</span></td>
+      <td class="${d.t?'':'t-muted'}">${d.t||'—'}</td><td>${d.f}</td>`;
+    if(elegido&&elegido.c===d.c) tr.classList.add('sel');
+    tr.onclick=()=>elegir(d,tr);
+    tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();elegir(d,tr)}};
+    return tr;
+  }
+  function cargarMas(){
+    const lote=filtrados.slice(mostrados,mostrados+LOTE);
+    lote.forEach(d=>tb.appendChild(fila(d))); mostrados+=lote.length;
+    $('cuenta').textContent=filtrados.length?`Mostrando ${mostrados} de ${filtrados.length} solicitudes`:'';
+  }
+  function filtrar(){
+    const q=norm($('q').value.trim()), fe=$('fe').value, fu=$('fu').value, fa=$('fa').value;
+    filtrados=datos.filter(d=>(!q||norm(d.c+' '+d.n+' '+d.id).includes(q))&&(!fe||d.e===fe)&&(!fu||d.u===fu)&&(!fa||d.a===fa));
+    tb.innerHTML=''; mostrados=0; quitar(); $('vacio').hidden=filtrados.length>0;
+    document.querySelector('.tbl').scrollTop=0; cargarMas();
+  }
+  function quitar(){
+    elegido=null; panel.classList.remove('on'); sel.textContent='Ninguna solicitud seleccionada';
+    need.forEach(b=>b.disabled=true); tb.querySelectorAll('.sel').forEach(x=>x.classList.remove('sel'));
+  }
+  function elegir(d,tr){
+    if(elegido&&elegido.c===d.c){quitar();return}
+    quitar(); elegido=d; tr.classList.add('sel');
+    sel.innerHTML='Seleccionada: <b>'+d.c+' · '+d.n+'</b>'; need.forEach(b=>b.disabled=false);
+    $('pcod').textContent=d.c;
+  }
+  let espera; $('q').addEventListener('input',()=>{clearTimeout(espera);espera=setTimeout(filtrar,200)});
+  ['fe','fu','fa'].forEach(i=>$(i).addEventListener('change',filtrar));
+  $('bEstado').addEventListener('click',()=>{panel.classList.add('on');$('ne').focus()});
+  $('bCancel').addEventListener('click',()=>panel.classList.remove('on'));
+  new IntersectionObserver(e=>{if(e[0].isIntersecting&&mostrados<filtrados.length)cargarMas()},
+    {root:matchMedia('(max-width:820px)').matches?null:document.querySelector('.tbl'),rootMargin:'200px'}).observe($('fin'));
+  filtrar();
+</script>
+</body>
+</html>
