@@ -18,6 +18,7 @@ import { aplicarFiltroCitas, filtroCitasDe } from '@/lib/crm/citas'
 import { feriados } from '@/lib/crm/disponibilidad'
 import { evaluarObjetivo, minutosHabilesEntre } from '@/lib/crm/objetivos'
 import { obtenerCatalogo } from '@/lib/crm/catalogo'
+import { titularesDe } from '@/lib/crm/titulares'
 import { TOPE_FILAS_REPORTE } from '@/lib/crm/config'
 import { instanteGuayaquil, sumarDias } from '@/lib/crm/fechas'
 import type { ReportesQuery } from '@/lib/crm/schemas'
@@ -25,6 +26,8 @@ import type { ReportesQuery } from '@/lib/crm/schemas'
 export type FiltrosReporte = ReportesQuery
 
 /** Un bloque de datos superó el tope de filas. La ruta responde 422 con `REPORTE_EXCEDE_TOPE`. */
+const LOTE_IDS = 80
+
 export class ExcedeTopeError extends Error {
   constructor(public bloque: string, public total: number, public tope: number) {
     super('EXCEDE_TOPE')
@@ -125,46 +128,6 @@ export async function leerConTope<T>(
     filas.push(...((data ?? []) as T[]))
   }
   return filas
-}
-
-// ─── Responsable = último titular ───────────────────────────────────────────
-
-const ESTADOS_TITULAR = ['pendiente_confirmacion', 'activo', 'finalizado']
-const LOTE_IDS = 80
-
-/** Último titular (personal_id) de cada solicitud, por lotes de ids para no pasar el límite de la URL. */
-export async function titularesDe(solicitudIds: string[]): Promise<Map<string, string>> {
-  const ids = [...new Set(solicitudIds)]
-  const ultimo = new Map<string, { personal: string; at: string }>()
-  const lotes: string[][] = []
-  for (let i = 0; i < ids.length; i += LOTE_IDS) lotes.push(ids.slice(i, i + LOTE_IDS))
-
-  for (let i = 0; i < lotes.length; i += 4) {
-    const resultados = await Promise.all(lotes.slice(i, i + 4).map((lote) =>
-      supabase
-        .from('crm_solicitud_equipo')
-        .select('solicitud_id,personal_id,propuesto_at')
-        .eq('rol', 'titular')
-        .in('estado', ESTADOS_TITULAR)
-        .in('solicitud_id', lote)
-        .limit(1000)))
-    for (const r of resultados) {
-      if (r.error) lanzar('titulares', r.error)
-      for (const f of (r.data ?? []) as { solicitud_id: string; personal_id: string; propuesto_at: string }[]) {
-        const previo = ultimo.get(f.solicitud_id)
-        if (!previo || f.propuesto_at > previo.at) ultimo.set(f.solicitud_id, { personal: f.personal_id, at: f.propuesto_at })
-      }
-    }
-  }
-  return new Map([...ultimo.entries()].map(([k, v]) => [k, v.personal]))
-}
-
-export async function nombresPersonal(ids: string[]): Promise<Map<string, string>> {
-  const unicos = [...new Set(ids)]
-  if (unicos.length === 0) return new Map()
-  const { data, error } = await supabase.from('crm_personal').select('id,nombres,apellidos').in('id', unicos)
-  if (error) lanzar('nombres del personal', error)
-  return new Map(((data ?? []) as { id: string; nombres: string; apellidos: string }[]).map((p) => [p.id, `${p.nombres} ${p.apellidos}`]))
 }
 
 /** Si hay responsable elegido, deja solo las filas cuyo caso tiene a esa persona como último titular. */

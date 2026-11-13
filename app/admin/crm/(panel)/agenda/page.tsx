@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import AgendaSemana, { type DiaAgenda } from '@/components/crm/AgendaSemana'
 import CitasLista from '@/components/crm/CitasLista'
 import { BOTON_BARRA, CLASE_ETIQUETA, CLASE_INPUT } from '@/components/crm/estilos'
-import { abogadosVisiblesEnAgenda, personalDePagina, puedeGestionarCitaSinCaso, puedeVerHorario } from '@/lib/crm/permisos'
+import { abogadosVisiblesEnAgenda, personalDePagina, puedeEditarHorario, puedeGestionarCitaSinCaso, puedeVerHorario } from '@/lib/crm/permisos'
 import { abogadosActivos, bloqueosEnRango, ETIQUETA_BLOQUEO, ETIQUETA_DIA, franjasDe } from '@/lib/crm/horarios'
 import { citasParaPantalla, listarCitas } from '@/lib/crm/citas'
 import { feriados } from '@/lib/crm/disponibilidad'
@@ -119,7 +119,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
           {sinHorario && (
             <p className="border border-border bg-card-bg px-4 py-3 font-montserrat text-xs text-text-muted">
               Este abogado aún no tiene horario configurado.{' '}
-              {personal.rol === 'direccion' && elegido && (
+              {puedeEditarHorario(personal) && elegido && (
                 <Link href={`/admin/crm/personal/${elegido.id}/horario`} className="focus-gold text-gold underline underline-offset-2">Configurar su horario</Link>
               )}
             </p>

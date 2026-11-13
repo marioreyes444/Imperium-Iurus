@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { autorizarApi, puedeGestionarCitasDe, puedeVerSolicitud } from '@/lib/crm/permisos'
+import { abogadosVisiblesEnAgenda, autorizarApi, puedeGestionarCitasDe, puedeVerSolicitud } from '@/lib/crm/permisos'
 import { jsonError, respuestaExcepcion, respuestaZod } from '@/lib/crm/errores'
 import { citaCrearSchema, citasQuerySchema, queryComoObjeto } from '@/lib/crm/schemas'
 import { agendarCita, listarCitas } from '@/lib/crm/citas'
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       const nivel = await puedeVerSolicitud(a.personal, d.solicitud_id)
       if (nivel !== 'completo' && nivel !== 'sin_juridico') return jsonError(404, 'No encontrado')
     }
-    if (a.personal.rol === 'asociado' && d.abogado_id && d.abogado_id !== a.personal.id && !d.solicitud_id) {
+    if (abogadosVisiblesEnAgenda(a.personal) === 'propio' && d.abogado_id && d.abogado_id !== a.personal.id && !d.solicitud_id) {
       return jsonError(403, 'Solo puedes ver tu propia agenda')
     }
     const items = await listarCitas(a.personal, { desde: d.desde, hasta: d.hasta, abogadoId: d.abogado_id, solicitudId: d.solicitud_id })

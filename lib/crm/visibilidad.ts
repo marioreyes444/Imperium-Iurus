@@ -3,7 +3,7 @@
 // carga progresiva, los conteos, los buscadores y los avisos sean correctos.
 import { supabase } from '@/lib/supabase'
 import { esTablaAusente } from '@/lib/crm/errores'
-import { CrmNoDisponibleError, type Personal } from '@/lib/crm/permisos'
+import { categoriaAlcance, CrmNoDisponibleError, puede, type Personal } from '@/lib/crm/permisos'
 
 /** UUID que nunca existe: sirve para pedir «ninguna fila» sin romper la sintaxis de `in.()`. */
 const UUID_NULO = '00000000-0000-0000-0000-000000000000'
@@ -136,7 +136,7 @@ export type Alcances = {
  *   · Contactos: igual, salvo que el externo no accede a ninguno.
  */
 export async function alcancesDe(personal: Personal): Promise<Alcances> {
-  if (personal.rol === 'direccion') {
+  if (categoriaAlcance(personal.rol) === 'todo') {
     // Se calculan igualmente los casos activos: sirven para decidir si «ver_reservado» aplica.
     const filas = await membresias(personal.id)
     const activas = filas.filter((f) => f.estado === 'activo')
@@ -153,7 +153,7 @@ export async function alcancesDe(personal: Personal): Promise<Alcances> {
   const solicitudesActivas = [...new Set(activas.map((f) => f.solicitud_id))]
   const contactosActivos = contactosDe(activas)
 
-  if (personal.rol === 'coordinacion' || personal.rol === 'asistencia') {
+  if (categoriaAlcance(personal.rol) === 'sin_reservados') {
     return {
       solicitudes: { modo: 'sin_reservados', incluir: solicitudesActivas },
       contactos: { modo: 'sin_reservados', incluir: contactosActivos },
@@ -174,7 +174,7 @@ export async function alcancesDe(personal: Personal): Promise<Alcances> {
   }
   return {
     solicitudes: { modo: 'solo', ids: [...visibles] },
-    contactos: personal.rol === 'externo' ? { modo: 'ninguno' } : { modo: 'solo', ids: contactosActivos },
+    contactos: !puede(personal.rol, 'contactos.ver') ? { modo: 'ninguno' } : { modo: 'solo', ids: contactosActivos },
     solicitudesActivas,
     contactosActivos,
   }

@@ -133,17 +133,17 @@ Marcar cada casilla al comprobarla. «API» = comprobar la respuesta de la ruta 
 | 6 | **Revisión de E2** | Diff de `app/api/contact/route.ts` y `app/api/appointments/route.ts` (llamada a `registrarEntrada` con `after()`; 409 «Horario no disponible») pendiente de aprobación del responsable de esos archivos; y de los archivos de la sección 12 (`app/api/appointments/[id]/route.ts`, `lib/schemas.ts`, `app/admin/agenda/*`) |
 | 7 | **Restricción de turnos en la base** | `crm_turnos` no impide que la misma persona tenga turnos cruzados; hoy se comprueba en el servidor (dos peticiones simultáneas podrían colarse). Pedir una restricción de exclusión |
 | 8 | **Catálogo E5** | `lib/crm/catalogo.ts` devuelve listas vacías si las tablas no existen; con el catálogo real, probar los selectores de área y servicio |
-| 9 | **Comparaciones de rol fuera de `permisos.ts`** | Ver la sección 5 |
-| 10 | **Filtro «titular» del listado de solicitudes** | La especificación (Entrega 2, sección 8) lo pide y `solicitudesQuerySchema` no lo tiene |
+| 9 | **Listas de roles en rutas y páginas** | `autorizarApi([...])` y `personalDePagina([...])` llevan listas literales de roles (más `ROLES_LECTURA`/`ROLES_ESCRITURA` en algunas rutas). Es el filtro de entrada, coherente con la matriz 4.3, pero vive fuera de `permisos.ts`. Candidato a un paso aparte: nombrarlas en `permisos.ts` |
+| 10 | **Filtro «titular» con muchos casos** | El filtro pasa los ids del último titular en la consulta; con más de 300 casos responde 422 `FILTRO_TITULAR_EXCEDE` (límite práctico de la URL). Si hace falta, resolverlo en la base |
 
 ---
 
-## 5. Comparaciones de rol fuera de `lib/crm/permisos.ts` (para el paso aparte)
+## 5. Permisos: dónde se deciden
 
-Decisiones de permiso hechas con `rol === '…'` en otros archivos (el código nuevo de la Entrega 5 no tiene ninguna). Son coherentes con la matriz 4.3, pero incumplen la regla «ningún permiso fuera de `permisos.ts`»:
+Todas las decisiones de permiso por rol viven en `lib/crm/permisos.ts` (funciones como `puedeMarcarReserva`, `puedeGestionarEquipo`, `puedeCambiarEstado`, `categoriaAlcance`, `puedeVerFicha`…). Las rutas, páginas y librerías las llaman; no comparan roles. En `estados.ts` quedan solo los datos (tabla de transiciones R-12); la decisión final de quién puede cada cambio es `puedeCambiarEstado` (8.1).
 
-- **Rutas API:** `app/api/admin/crm/bitacora/route.ts:32` · `citas/route.ts:31` · `contactos/[id]/route.ts:87,94` · `personal/[id]/bloqueos/route.ts:18` · `solicitudes/route.ts:83,105,107,108,109,146` · `solicitudes/[id]/route.ts:73`.
-- **Páginas:** `app/admin/crm/(panel)/agenda/page.tsx:122` · `contactos/page.tsx:9` · `layout.tsx:51` · `personal/[id]/page.tsx:40` · `solicitudes/page.tsx:19,20,21` · `solicitudes/nueva/page.tsx:44,45` · `solicitudes/[id]/page.tsx:213,214,215,216,217,227,229` · `tareas/page.tsx:9`.
-- **Librerías:** `lib/crm/actividades.ts:188,189,191,329,393` · `citas.ts:93,94,96,379,458,477` · `contadores.ts:10` · `detalles.ts:29,88–93,138,254,297–300` · `estados.ts:92,94,96,98,100,103` · `personal.ts:52,55` · `tablero.ts:55,67` · `visibilidad.ts:139,156,177`.
+Excepciones que NO son permisos y se dejan donde están:
 
-(Los números de línea son de la entrega actual; cambian al editar.)
+- **Coherencia rol ↔ `es_abogado`** (un asociado es siempre abogado; un externo no ejerce patrocinio): refleja los CHECK de `crm_personal` en M4. Está en `components/crm/PersonalForm.tsx`, `UsuarioForm.tsx`, `app/api/admin/crm/personal/[id]/route.ts` y `usuarios/route.ts` y `usuarios/[id]/route.ts`.
+- **`lib/crm/roles.ts`**: conversión de rol a `app_metadata.role` (Dirección = `admin`).
+- **`lib/crm/avisos.ts`**: a qué roles se dirige un aviso (`roles: ['direccion']`…). Es enrutamiento de notificaciones, no una comprobación de acceso.

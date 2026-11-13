@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { personalDePagina, puedeVerHorario } from '@/lib/crm/permisos'
+import { personalDePagina, puede, puedeEditarFicha, puedeVerFicha, puedeVerHorario } from '@/lib/crm/permisos'
 import { ROL_LABEL, esRol } from '@/lib/crm/roles'
 import { uuidSchema } from '@/lib/crm/schemas'
-import { areasDe, cargaDe, obtenerFicha, puedeEditarFicha, puedeVerFicha } from '@/lib/crm/personal'
+import { areasDe, cargaDe, obtenerFicha } from '@/lib/crm/personal'
 import { obtenerCatalogo } from '@/lib/crm/catalogo'
 import { formatoFecha } from '@/components/crm/formato'
 import { BOTON_BARRA } from '@/components/crm/estilos'
@@ -37,7 +37,7 @@ export default async function FichaPersonalPage({ params }: { params: Promise<{ 
 
   const [carga, areas, catalogo] = await Promise.all([cargaDe(id), areasDe(id), obtenerCatalogo()])
   const nombreArea = (areaId: string) => catalogo.areas.find((a) => a.id === areaId)?.nombre ?? 'Área'
-  const verLista = personal.rol === 'direccion' || personal.rol === 'coordinacion'
+  const verLista = puede(personal.rol, 'personal.ver')
 
   return (
     <div className="space-y-8 px-6 pb-16 pt-8">

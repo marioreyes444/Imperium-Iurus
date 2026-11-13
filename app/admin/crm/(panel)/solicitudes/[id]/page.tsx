@@ -4,7 +4,8 @@ import SolicitudAcciones from '@/components/crm/SolicitudAcciones'
 import { IndicadorEstado, IndicadorUrgencia } from '@/components/crm/IndicadoresSolicitud'
 import { formatoFechaHora } from '@/components/crm/formato'
 import {
-  esTitularActivo, personalDePagina, puedeCrearActividad, puedeEditarExpediente, puedeGestionarCitasDe, puedeVerExpediente, recibeJuridicas,
+  esTitularActivo, personalDePagina, puedeAprobarAsignacion, puedeCrearActividad, puedeEditarExpediente, puedeGestionarCitasDe,
+  puedeGestionarEquipo, puedeReasignarTitular, puedeVerExpediente, recibeJuridicas, soloRegistraNotas,
 } from '@/lib/crm/permisos'
 import { uuidSchema } from '@/lib/crm/schemas'
 import { detalleSolicitud, type DetalleSolicitud } from '@/lib/crm/detalles'
@@ -210,11 +211,11 @@ export default async function SolicitudPage({
           conflicto={{ valor: s.conflicto_revision, etiqueta: CONFLICTO[s.conflicto_revision] ?? s.conflicto_revision }}
           admiteEquipo={admiteEquipo}
           admiteReasignar={admiteReasignar}
-          puedeConflicto={abierta && (rol === 'direccion' || rol === 'coordinacion')}
-          puedeProponer={abierta && (rol === 'direccion' || rol === 'coordinacion')}
-          puedeAprobar={abierta && rol === 'direccion'}
-          puedeFinalizar={abierta && (rol === 'direccion' || rol === 'coordinacion')}
-          puedeReasignar={abierta && rol === 'direccion'}
+          puedeConflicto={abierta && puedeGestionarEquipo(rol)}
+          puedeProponer={abierta && puedeGestionarEquipo(rol)}
+          puedeAprobar={abierta && puedeAprobarAsignacion(rol)}
+          puedeFinalizar={abierta && puedeGestionarEquipo(rol)}
+          puedeReasignar={abierta && puedeReasignarTitular(rol)}
           soloLectura={cerrada}
           miembros={miembros}
           motivosReasignacion={Object.entries(ETIQUETA_MOTIVO_REASIGNACION).map(([valor, etiqueta]) => ({ valor, etiqueta }))}
@@ -224,9 +225,9 @@ export default async function SolicitudPage({
       {pestana === 'cronologia' && (
         <CronologiaPanel
           solicitudId={s.id}
-          puedeRegistrar={!cerrada && puedeCrearActividad(personal, nivel, { tipo: rol === 'externo' ? 'nota' : 'llamada', es_juridica: false, es_plazo_juridico: false })}
+          puedeRegistrar={!cerrada && puedeCrearActividad(personal, nivel, { tipo: soloRegistraNotas(rol) ? 'nota' : 'llamada', es_juridica: false, es_plazo_juridico: false })}
           permiteJuridico={recibeJuridicas(rol) && (nivel === 'completo' || nivel === 'reducido')}
-          soloNotas={rol === 'externo'}
+          soloNotas={soloRegistraNotas(rol)}
           puedeCrearTareas={!cerrada && puedeCrearActividad(personal, nivel, { tipo: 'tarea', es_juridica: false, es_plazo_juridico: false })}
         />
       )}

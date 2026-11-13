@@ -346,6 +346,8 @@ export const solicitudesQuerySchema = paginacion.extend({
   area: uuidSchema.optional(),
   validacion: z.enum(['true']).optional(),
   contacto: uuidSchema.optional(),
+  /** Último titular del caso (solo Dirección y Coordinación). */
+  titular: uuidSchema.optional(),
 })
 
 // ═══════════════════════════════════════════════════════════════════════════

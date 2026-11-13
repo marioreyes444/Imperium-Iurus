@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { autorizarApi } from '@/lib/crm/permisos'
+import { autorizarApi, puedeFiltrarPorTitular, puedeMarcarReserva, tieneVistaReducida } from '@/lib/crm/permisos'
+import { idsDeUltimoTitular, TOPE_IDS_FILTRO_TITULAR } from '@/lib/crm/titulares'
 import { jsonError, respuestaErrorBD, respuestaExcepcion, respuestaZod } from '@/lib/crm/errores'
 import { queryComoObjeto, solicitudCrearSchema, solicitudesQuerySchema } from '@/lib/crm/schemas'
 import { alcancesDe, aplicarAlcance, contactosVisiblesEntre } from '@/lib/crm/visibilidad'
@@ -31,9 +32,10 @@ export async function GET(request: NextRequest) {
 
   const parsed = solicitudesQuerySchema.safeParse(queryComoObjeto(request.nextUrl.searchParams))
   if (!parsed.success) return respuestaZod(parsed.error)
-  const { q, estado, urgencia, area, validacion, contacto, cursor, limite } = parsed.data
+  const { q, estado, urgencia, area, validacion, contacto, titular, cursor, limite } = parsed.data
   const desde = leerCursor(cursor)
   if (desde === null) return jsonError(400, 'Cursor inválido')
+  if (titular && !puedeFiltrarPorTitular(a.personal.rol)) return jsonError(403, 'No tienes permiso para esta acción')
 
   try {
     const al = await alcancesDe(a.personal)
@@ -49,6 +51,15 @@ export async function GET(request: NextRequest) {
     if (urgencia) query = query.eq('urgencia', urgencia)
     if (area) query = query.eq('area_principal_id', area)
     if (validacion) query = query.eq('estado', 'nueva').eq('requiere_validacion', true)
+    // Último titular: los ids se aplican EN la consulta, junto con la visibilidad (un caso reservado
+    // que la persona no ve no aparece aunque el titular sea el elegido).
+    if (titular) {
+      const idsTitular = await idsDeUltimoTitular(titular)
+      if (idsTitular.length > TOPE_IDS_FILTRO_TITULAR) {
+        return jsonError(422, 'Esa persona tiene demasiados casos para filtrar por titular. Agrega otro filtro o usa los reportes.', { codigo: 'FILTRO_TITULAR_EXCEDE' })
+      }
+      query = query.in('id', idsTitular.length > 0 ? idsTitular : ['00000000-0000-0000-0000-000000000000'])
+    }
 
     const extraOr: string[] = []
     if (contacto) extraOr.push(`contacto_id.eq.${contacto},empresa_id.eq.${contacto}`)
@@ -80,7 +91,8 @@ export async function GET(request: NextRequest) {
 
     // Contactos de la página: «Contacto reservado» si no puede ver la ficha; el externo no ve contactos.
     const nombres = new Map<string, string>()
-    const visibles = a.personal.rol === 'externo'
+    const vistaReducida = tieneVistaReducida(a.personal.rol)
+    const visibles = vistaReducida
       ? new Set<string>()
       : await contactosVisiblesEntre(pagina.items.map((s) => s.contacto_id), al.contactos)
     if (visibles.size > 0) {
@@ -102,11 +114,11 @@ export async function GET(request: NextRequest) {
         fase: FASE_ESTADO[s.estado as Estado] ?? 'terminado',
         urgencia: s.urgencia,
         // Vista reducida (externo): solo código, estado, urgencia y área; sin canal ni marcas internas.
-        canal_origen: a.personal.rol === 'externo' ? undefined : s.canal_origen,
+        canal_origen: vistaReducida ? undefined : s.canal_origen,
         area: catalogo.areas.find((x) => x.id === s.area_principal_id)?.nombre ?? null,
-        requiere_validacion: a.personal.rol === 'externo' ? false : s.requiere_validacion,
-        reserva_reforzada: a.personal.rol === 'externo' ? false : s.reserva_reforzada,
-        contacto: a.personal.rol === 'externo' ? null : visibles.has(s.contacto_id) ? (nombres.get(s.contacto_id) ?? '—') : 'Contacto reservado',
+        requiere_validacion: vistaReducida ? false : s.requiere_validacion,
+        reserva_reforzada: vistaReducida ? false : s.reserva_reforzada,
+        contacto: vistaReducida ? null : visibles.has(s.contacto_id) ? (nombres.get(s.contacto_id) ?? '—') : 'Contacto reservado',
         fecha_recepcion: s.fecha_recepcion,
         created_at: s.created_at,
         updated_at: s.updated_at,
@@ -143,7 +155,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Marcar reserva a mano: Dirección y coordinación. Las solicitudes de un contacto reservado nacen reservadas.
-    if (d.reserva_reforzada === true && rol === 'asistencia') {
+    if (d.reserva_reforzada === true && !puedeMarcarReserva(rol)) {
       return jsonError(403, 'No tienes permiso para marcar la reserva reforzada')
     }
     const reservada = d.reserva_reforzada === true || lista.some((f) => f.reserva_reforzada)

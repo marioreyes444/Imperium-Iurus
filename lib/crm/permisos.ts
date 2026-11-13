@@ -519,3 +519,129 @@ export function nivelTablero(rol: Rol): NivelTablero {
 export const puedeVerReportes = (rol: Rol) => puede(rol, 'reportes.ver')
 export const puedeExportar = (rol: Rol) => puede(rol, 'exportar.csv')
 export const puedeGestionarTurnos = (rol: Rol) => puede(rol, 'turnos.gestionar')
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CIERRE DEL MÓDULO — Las preguntas «¿qué rol es?» que antes vivían en rutas, páginas y librerías.
+// Cada función devuelve exactamente lo mismo que la comparación que reemplazó. Las que no están en
+// `ACCIONES` lo están a propósito: añadirlas a la matriz cambiaría la lista de permisos que expone la
+// ruta /api/admin/crm/yo.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const esDireccion = (rol: Rol) => rol === 'direccion'
+export const esDireccionOCoordinacion = (rol: Rol) => rol === 'direccion' || rol === 'coordinacion'
+
+/**
+ * Cuánto ve una persona de los casos y contactos (4.2), antes de aplicar la visibilidad en la consulta:
+ *   · `todo`: Dirección. · `sin_reservados`: coordinación y asistencia (más los reservados de su equipo
+ *   activo). · `equipo`: asociado y externo, solo donde están en el equipo.
+ */
+export type CategoriaAlcance = 'todo' | 'sin_reservados' | 'equipo'
+export function categoriaAlcance(rol: Rol): CategoriaAlcance {
+  if (rol === 'direccion') return 'todo'
+  if (rol === 'coordinacion' || rol === 'asistencia') return 'sin_reservados'
+  return 'equipo'
+}
+
+/** Enlace «Panel Admin» del armazón del CRM: solo Dirección (equivale al admin). */
+export const veEnlacePanelAdmin = (rol: Rol) => rol === 'direccion'
+
+// ─── Fichas del personal (antes en lib/crm/personal.ts) ─────────────────────
+
+/** Quién puede ver una ficha: Dirección y Coordinación, todas; el resto, solo la suya. */
+export const puedeVerFicha = (personal: Personal, fichaId: string) =>
+  personal.rol === 'direccion' || personal.rol === 'coordinacion' || personal.id === fichaId
+
+/** Quién puede editarla: Dirección y Coordinación. */
+export const puedeEditarFicha = (personal: Personal) => personal.rol === 'direccion' || personal.rol === 'coordinacion'
+
+// ─── Solicitudes y contactos ────────────────────────────────────────────────
+
+/** Vista reducida del externo: sin canal, marcas internas ni datos del contacto. */
+export const tieneVistaReducida = (rol: Rol) => rol === 'externo'
+
+/** Crear solicitudes (y crear una desde la ficha de un contacto): D, C, A. */
+export const puedeCrearSolicitudes = (rol: Rol) => rol === 'direccion' || rol === 'coordinacion' || rol === 'asistencia'
+
+/** Botones «Editar» y «Cambiar estado» del listado: todos menos el externo (el detalle decide el resto). */
+export const puedeEditarEnListadoSolicitudes = (rol: Rol) => rol !== 'externo'
+
+/** Validar o descartar un envío de la bandeja de validación: D, C, A. */
+export const puedeValidarEnvios = (rol: Rol) => rol === 'direccion' || rol === 'coordinacion' || rol === 'asistencia'
+
+/** Editar los datos de calificación de un caso: D, C, A; el asociado, con nivel completo. */
+export const puedeEditarSolicitud = (rol: Rol, nivel: NivelVista | null) =>
+  rol === 'direccion' || rol === 'coordinacion' || rol === 'asistencia' || (rol === 'asociado' && nivel === 'completo')
+
+/** Marcar reserva reforzada en un contacto o al crear una solicitud: D y C. Quitarla: solo Dirección. */
+export const puedeMarcarReserva = (rol: Rol) => rol === 'direccion' || rol === 'coordinacion'
+export const puedeQuitarReserva = (rol: Rol) => rol === 'direccion'
+
+/**
+ * Marcar reserva reforzada en un caso existente: D, C y el asociado en sus casos. Sin `nivel` (la ruta ya
+ * comprobó el acceso al caso) basta el rol; con `nivel`, el asociado necesita acceso completo.
+ */
+export const puedeMarcarReservaEnCaso = (rol: Rol, nivel?: NivelVista | null) =>
+  rol === 'direccion' || rol === 'coordinacion' || (rol === 'asociado' && (nivel === undefined || nivel === 'completo'))
+
+/** Crear contactos: D, C, A (el asociado edita los de sus casos, no crea). */
+export const puedeCrearContactos = (rol: Rol) => rol === 'direccion' || rol === 'coordinacion' || rol === 'asistencia'
+/** Cambiar a mano la etapa de relación de un contacto: todos los que lo editan menos el asociado. */
+export const puedeCambiarEtapaContacto = (rol: Rol) => rol === 'direccion' || rol === 'coordinacion' || rol === 'asistencia'
+/** Vincular personas con una empresa: D, C, A. */
+export const puedeVincularContactos = (rol: Rol) => rol === 'direccion' || rol === 'coordinacion' || rol === 'asistencia'
+/** Marcar un posible duplicado a mano: D, C, A. */
+export const puedeMarcarDuplicado = (rol: Rol) => rol === 'direccion' || rol === 'coordinacion' || rol === 'asistencia'
+/** Fusionar o descartar un par de duplicados: D y C. */
+export const puedeResolverDuplicados = (rol: Rol) => rol === 'direccion' || rol === 'coordinacion'
+
+// ─── Equipo y asignación ────────────────────────────────────────────────────
+
+/** Revisión de conflictos, proponer equipo y retirar a un miembro: D y C. */
+export const puedeGestionarEquipo = (rol: Rol) => rol === 'direccion' || rol === 'coordinacion'
+export const puedeAprobarAsignacion = (rol: Rol) => rol === 'direccion'
+export const puedeReasignarTitular = (rol: Rol) => rol === 'direccion'
+
+// ─── Estados (sección 8.1) ──────────────────────────────────────────────────
+
+/**
+ * ¿Puede el rol hacer este cambio de estado? La TABLA de transiciones (R-12) vive en lib/crm/estados.ts
+ * como dato; ESTA función es la decisión de permiso. Recibe valores simples para no importar estados.ts
+ * (evita una importación circular): `desde` y `hacia` son estados de la solicitud.
+ */
+export function puedeCambiarEstado(
+  rol: Rol,
+  c: { desde: string; hacia: string; requiereValidacion: boolean; esTitularActivo: boolean },
+): boolean {
+  const reapertura = c.desde === 'cerrada' || c.desde === 'descartada'
+  if (reapertura) return rol === 'direccion'
+  if (c.hacia === 'descartada') {
+    if (rol === 'direccion') return true
+    // Coordinación y asistencia solo descartan un envío por validar.
+    return (rol === 'coordinacion' || rol === 'asistencia') && c.desde === 'nueva' && c.requiereValidacion
+  }
+  if (c.hacia === 'aceptada_pendiente_asignacion') return rol === 'direccion'
+  if (c.hacia === 'en_espera' || c.hacia === 'cerrada' || (c.desde === 'en_espera' && c.hacia === 'en_curso')) {
+    return rol === 'direccion' || rol === 'coordinacion' || c.esTitularActivo
+  }
+  // Hacia calificación, información pendiente, consulta agendada, propuesta enviada o pendiente de aceptación.
+  return rol === 'direccion' || rol === 'coordinacion' || rol === 'asistencia'
+}
+
+// ─── Actividades, tareas y citas ────────────────────────────────────────────
+
+/** El externo solo ve las tareas que se le asignaron; los demás, también las de sus casos. */
+export const veTareasDeSusCasos = (rol: Rol) => rol !== 'externo'
+
+/** El externo solo registra notas en la cronología de sus casos. */
+export const soloRegistraNotas = (rol: Rol) => rol === 'externo'
+
+/** Una actividad sin caso (poco frecuente) solo la ven Dirección y Coordinación. */
+export const veActividadesSinCaso = (rol: Rol) => rol === 'direccion' || rol === 'coordinacion'
+
+/** Si cancela una cita, la tarea de reagendar es de quien cancela cuando es asistencia o coordinación. */
+export const asumeTareaDeCancelacion = (rol: Rol) => rol === 'asistencia' || rol === 'coordinacion'
+/** Si no, el responsable es la primera persona activa de estos roles, en este orden. */
+export const ORDEN_RESPONSABLE_CANCELACION: readonly Rol[] = ['asistencia', 'coordinacion', 'direccion']
+
+/** Filtro «titular» del listado de solicitudes (sección 8, Entrega 2): Dirección y Coordinación. */
+export const puedeFiltrarPorTitular = (rol: Rol) => rol === 'direccion' || rol === 'coordinacion'

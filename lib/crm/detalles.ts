@@ -2,7 +2,10 @@
 // Cada función aplica la visibilidad en la consulta y devuelve `null` si la persona no puede ver el
 // registro (las rutas responden 404, nunca 403, para no revelar que existe).
 import { supabase } from '@/lib/supabase'
-import { puedeVerSolicitud, type Personal } from '@/lib/crm/permisos'
+import {
+  esDireccion, puede, puedeCambiarEtapaContacto, puedeCrearSolicitudes, puedeEditarSolicitud, puedeMarcarDuplicado, puedeMarcarReserva,
+  puedeMarcarReservaEnCaso, puedeQuitarReserva, puedeResolverDuplicados, puedeValidarEnvios, puedeVerSolicitud, puedeVincularContactos, type Personal,
+} from '@/lib/crm/permisos'
 import { alcancesDe, aplicarAlcance, contactosVisiblesEntre } from '@/lib/crm/visibilidad'
 import { registrar } from '@/lib/crm/bitacora'
 import { obtenerPar } from '@/lib/crm/duplicados'
@@ -26,7 +29,7 @@ export async function detalleContacto(personal: Personal, id: string) {
   const contacto = data as unknown as ContactoFila
 
   // Dirección siempre lo ve; si es reservado y no está en el equipo de ningún caso suyo, queda registrado.
-  if (personal.rol === 'direccion' && contacto.reserva_reforzada && !al.contactosActivos.includes(id)) {
+  if (esDireccion(personal.rol) && contacto.reserva_reforzada && !al.contactosActivos.includes(id)) {
     await registrar({ userId: personal.user_id, accion: 'ver_reservado', entidad: 'crm_contactos', entidadId: id })
   }
 
@@ -85,12 +88,12 @@ export async function detalleContacto(personal: Personal, id: string) {
       .map((p) => ({ id: p.id, otro_id: otroDe(p), coincidencia: p.coincidencia })),
     permisos: {
       editar: editable,
-      marcar_reserva: editable && (rol === 'direccion' || rol === 'coordinacion'),
-      quitar_reserva: editable && rol === 'direccion',
-      etapa_manual: editable && rol !== 'asociado',
-      vincular: editable && rol !== 'asociado',
-      marcar_duplicado: editable && rol !== 'asociado',
-      crear_solicitud: editable && (rol === 'direccion' || rol === 'coordinacion' || rol === 'asistencia'),
+      marcar_reserva: editable && puedeMarcarReserva(rol),
+      quitar_reserva: editable && puedeQuitarReserva(rol),
+      etapa_manual: editable && puedeCambiarEtapaContacto(rol),
+      vincular: editable && puedeVincularContactos(rol),
+      marcar_duplicado: editable && puedeMarcarDuplicado(rol),
+      crear_solicitud: editable && puedeCrearSolicitudes(rol),
     },
   }
 }
@@ -135,7 +138,7 @@ export async function detalleDuplicado(personal: Personal, id: string) {
     par: { id: par.id, coincidencia: par.coincidencia, estado: par.estado, created_at: par.created_at },
     a: await ficha(par.contacto_a),
     b: await ficha(par.contacto_b),
-    puede_resolver: par.estado === 'pendiente' && (personal.rol === 'direccion' || personal.rol === 'coordinacion'),
+    puede_resolver: par.estado === 'pendiente' && puedeResolverDuplicados(personal.rol),
   }
 }
 
@@ -251,7 +254,7 @@ export async function detalleSolicitud(personal: Personal, id: string) {
     const filasEstado = (est ?? []) as { id: number; estado_anterior: string | null; estado_nuevo: string; motivo: string | null; user_id: string | null; created_at: string }[]
 
     let filasRegistro: { id: number; accion: string; user_id: string | null; motivo: string | null; created_at: string }[] = []
-    if (personal.rol === 'direccion' || personal.rol === 'coordinacion' || personal.rol === 'asociado') {
+    if (puede(personal.rol, 'bitacora.ver_caso')) {
       const { data: reg } = await supabase
         .from('crm_bitacora')
         .select('id,accion,user_id,motivo,created_at')
@@ -294,10 +297,10 @@ export async function detalleSolicitud(personal: Personal, id: string) {
       pide_cierre: e === 'cerrada',
     })),
     permisos: {
-      editar: abierta && (rol === 'direccion' || rol === 'coordinacion' || rol === 'asistencia' || (rol === 'asociado' && nivel === 'completo')),
-      marcar_reserva: abierta && (rol === 'direccion' || rol === 'coordinacion' || (rol === 'asociado' && nivel === 'completo')),
-      quitar_reserva: abierta && rol === 'direccion',
-      validar: completa && estado === 'nueva' && s.requiere_validacion && (rol === 'direccion' || rol === 'coordinacion' || rol === 'asistencia'),
+      editar: abierta && puedeEditarSolicitud(rol, nivel),
+      marcar_reserva: abierta && puedeMarcarReservaEnCaso(rol, nivel),
+      quitar_reserva: abierta && puedeQuitarReserva(rol),
+      validar: completa && estado === 'nueva' && s.requiere_validacion && puedeValidarEnvios(rol),
     },
     solo_lectura: cerrada,
   }

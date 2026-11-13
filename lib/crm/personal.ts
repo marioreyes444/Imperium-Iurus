@@ -1,7 +1,7 @@
 // Fichas del personal (Entrega 3): columnas, lectura con carga y áreas de referencia.
 import { supabase } from '@/lib/supabase'
 import { esTablaAusente } from '@/lib/crm/errores'
-import { CrmNoDisponibleError, type Personal } from '@/lib/crm/permisos'
+import { CrmNoDisponibleError } from '@/lib/crm/permisos'
 
 export const COLUMNAS_FICHA =
   'id,user_id,rol,nombres,apellidos,identificacion,correo,telefono,ciudad,es_abogado,matricula,' +
@@ -46,13 +46,6 @@ export function fichaParaPantalla(f: FichaFila) {
   const { user_id, ...resto } = f
   return { ...resto, sin_cuenta: user_id === null }
 }
-
-/** Quién puede ver la ficha: Dirección y Coordinación, todas; el resto, solo la suya. */
-export const puedeVerFicha = (personal: Personal, fichaId: string) =>
-  personal.rol === 'direccion' || personal.rol === 'coordinacion' || personal.id === fichaId
-
-/** Quién puede editarla: Dirección y Coordinación. */
-export const puedeEditarFicha = (personal: Personal) => personal.rol === 'direccion' || personal.rol === 'coordinacion'
 
 export async function obtenerFicha(id: string): Promise<FichaFila | null> {
   const { data, error } = await supabase.from('crm_personal').select(COLUMNAS_FICHA).eq('id', id).maybeSingle()

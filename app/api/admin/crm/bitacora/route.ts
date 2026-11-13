@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { ACCIONES, autorizarApi, CrmNoDisponibleError, puedeVerSolicitud } from '@/lib/crm/permisos'
+import { ACCIONES, autorizarApi, CrmNoDisponibleError, puede, puedeVerSolicitud } from '@/lib/crm/permisos'
 import { jsonError, respuestaErrorBD, respuestaZod } from '@/lib/crm/errores'
 import { bitacoraQuerySchema, queryComoObjeto } from '@/lib/crm/schemas'
 
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   if (!parsed.success) return respuestaZod(parsed.error)
   const { entidad, entidad_id, usuario, accion, desde, hasta, cursor, limite } = parsed.data
 
-  if (a.personal.rol !== 'direccion') {
+  if (!puede(a.personal.rol, 'bitacora.ver')) {
     if (entidad !== 'crm_solicitudes' || !entidad_id) return jsonError(403, 'No tienes permiso para esta acción')
     try {
       const nivel = await puedeVerSolicitud(a.personal, entidad_id)

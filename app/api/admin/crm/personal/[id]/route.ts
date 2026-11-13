@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { autorizarApi } from '@/lib/crm/permisos'
+import { autorizarApi, puedeEditarFicha, puedeVerFicha } from '@/lib/crm/permisos'
 import { jsonError, respuestaErrorBD, respuestaExcepcion, respuestaZod } from '@/lib/crm/errores'
 import { personalEditarSchema, uuidSchema } from '@/lib/crm/schemas'
 import { registrar } from '@/lib/crm/bitacora'
 import { hoyGuayaquil } from '@/lib/crm/fechas'
 import {
-  areasDe, cargaDe, COLUMNAS_FICHA, fichaParaPantalla, obtenerFicha, puedeEditarFicha, puedeVerFicha, type FichaFila,
+  areasDe, cargaDe, COLUMNAS_FICHA, fichaParaPantalla, obtenerFicha, type FichaFila,
 } from '@/lib/crm/personal'
 
 type Ctx = { params: Promise<{ id: string }> }

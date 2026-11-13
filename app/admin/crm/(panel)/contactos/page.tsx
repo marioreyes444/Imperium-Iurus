@@ -1,12 +1,12 @@
 import ContactosLista from '@/components/crm/ContactosLista'
-import { personalDePagina } from '@/lib/crm/permisos'
+import { personalDePagina, puedeCrearContactos } from '@/lib/crm/permisos'
 import { ETIQUETA_ETAPA } from '@/lib/crm/contactos'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ContactosPage() {
   const personal = await personalDePagina(['direccion', 'coordinacion', 'asistencia', 'asociado'])
-  const crea = personal.rol !== 'asociado'
+  const crea = puedeCrearContactos(personal.rol)
 
   return (
     <ContactosLista

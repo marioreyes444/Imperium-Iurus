@@ -11,7 +11,8 @@
 //     teléfono, identificación, dirección ni ciudad. El caso se identifica por su código.
 import { alcancesDe, contactoVisibleEn } from '@/lib/crm/visibilidad'
 import type { Personal } from '@/lib/crm/permisos'
-import { COLUMNAS_SOLICITUD_REPORTE, nombresPersonal, solicitudesDelPeriodo, titularesDe, type FiltrosReporte, type SolicitudReporte } from '@/lib/crm/reportes'
+import { COLUMNAS_SOLICITUD_REPORTE, solicitudesDelPeriodo, type FiltrosReporte, type SolicitudReporte } from '@/lib/crm/reportes'
+import { nombresPersonal, titularesDe } from '@/lib/crm/titulares'
 import { feriados } from '@/lib/crm/disponibilidad'
 import { evaluarObjetivo, minutosHabilesEntre } from '@/lib/crm/objetivos'
 import { obtenerCatalogo } from '@/lib/crm/catalogo'

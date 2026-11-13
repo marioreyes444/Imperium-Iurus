@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { autorizarApi } from '@/lib/crm/permisos'
+import { autorizarApi, puedeCambiarEtapaContacto, puedeMarcarReserva, puedeQuitarReserva } from '@/lib/crm/permisos'
 import { jsonError, respuestaErrorBD, respuestaExcepcion, respuestaZod } from '@/lib/crm/errores'
 import { contactoEditarSchema, uuidSchema } from '@/lib/crm/schemas'
 import { alcancesDe, aplicarAlcance } from '@/lib/crm/visibilidad'
@@ -84,14 +84,14 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
     // Reserva reforzada: marcar D y C; quitar solo Dirección.
     if (d.reserva_reforzada !== undefined && d.reserva_reforzada !== actual.reserva_reforzada) {
-      const permitido = d.reserva_reforzada ? rol === 'direccion' || rol === 'coordinacion' : rol === 'direccion'
+      const permitido = d.reserva_reforzada ? puedeMarcarReserva(rol) : puedeQuitarReserva(rol)
       if (!permitido) return jsonError(403, 'No tienes permiso para cambiar la reserva reforzada')
       cambios.reserva_reforzada = d.reserva_reforzada
     }
 
     // Etapa a mano: «no continúa» (con motivo, R-06) o reanudar. No para el asociado.
     if (d.etapa_manual) {
-      if (rol === 'asociado') return jsonError(403, 'No tienes permiso para cambiar la etapa')
+      if (!puedeCambiarEtapaContacto(rol)) return jsonError(403, 'No tienes permiso para cambiar la etapa')
       if (d.etapa_manual === 'no_continua') {
         cambios.etapa_relacion = 'no_continua'
         cambios.motivo_no_continua = d.motivo_no_continua

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { autorizarApi, puedeVerSolicitud } from '@/lib/crm/permisos'
+import { autorizarApi, puedeMarcarReservaEnCaso, puedeQuitarReserva, puedeVerSolicitud } from '@/lib/crm/permisos'
 import { jsonError, respuestaErrorBD, respuestaExcepcion, respuestaZod } from '@/lib/crm/errores'
 import { solicitudEditarSchema, uuidSchema } from '@/lib/crm/schemas'
 import { registrar } from '@/lib/crm/bitacora'
@@ -70,7 +70,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
     // Reserva reforzada: marcar D, C y el asociado en sus casos; quitar solo Dirección.
     if (d.reserva_reforzada !== undefined && d.reserva_reforzada !== actual.reserva_reforzada) {
-      const permitido = d.reserva_reforzada ? rol === 'direccion' || rol === 'coordinacion' || rol === 'asociado' : rol === 'direccion'
+      const permitido = d.reserva_reforzada ? puedeMarcarReservaEnCaso(rol) : puedeQuitarReserva(rol)
       if (!permitido) return jsonError(403, 'No tienes permiso para cambiar la reserva reforzada')
       cambios.reserva_reforzada = d.reserva_reforzada
     }

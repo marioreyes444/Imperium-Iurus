@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { esTablaAusente } from '@/lib/crm/errores'
-import { CrmNoDisponibleError, type Personal } from '@/lib/crm/permisos'
+import { categoriaAlcance, CrmNoDisponibleError, recibeJuridicas, type Personal } from '@/lib/crm/permisos'
 import { alcancesDe, aplicarAlcance, type Alcance } from '@/lib/crm/visibilidad'
 import { bandejaTareas, contarVencimientos } from '@/lib/crm/actividades'
 import { feriados } from '@/lib/crm/disponibilidad'
@@ -52,7 +52,7 @@ async function contarSolicitudes(
 /** Versión básica (Entrega 1): pendientes propios y contadores. */
 export async function obtenerTablero(personal: Personal): Promise<Tablero> {
   const ahora = new Date().toISOString()
-  const veTodo = personal.rol === 'direccion' || personal.rol === 'coordinacion' || personal.rol === 'asistencia'
+  const veTodo = categoriaAlcance(personal.rol) !== 'equipo'
   const { solicitudes: alcance } = await alcancesDe(personal)
 
   // Tareas propias. Asistencia nunca recibe actividades jurídicas.
@@ -64,7 +64,7 @@ export async function obtenerTablero(personal: Personal): Promise<Tablero> {
     .eq('estado_tarea', 'pendiente')
     .order('vence_at', { ascending: true })
     .limit(50)
-  if (personal.rol === 'asistencia') qTareas = qTareas.eq('es_juridica', false)
+  if (!recibeJuridicas(personal.rol)) qTareas = qTareas.eq('es_juridica', false)
 
   const { data: tareas, error: errTareas } = await qTareas
   if (errTareas) {

@@ -7,7 +7,10 @@
 import type { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { esCruceCita, esTablaAusente, jsonError, respuestaErrorBD } from '@/lib/crm/errores'
-import { CrmNoDisponibleError, puedeGestionarCita, puedeVerSolicitud, type Personal } from '@/lib/crm/permisos'
+import {
+  asumeTareaDeCancelacion, categoriaAlcance, CrmNoDisponibleError, esDireccion, ORDEN_RESPONSABLE_CANCELACION, puede, puedeGestionarCita,
+  puedeVerSolicitud, type Personal,
+} from '@/lib/crm/permisos'
 import { alcancesDe } from '@/lib/crm/visibilidad'
 import { registrar } from '@/lib/crm/bitacora'
 import { cambiarEstado, type Estado } from '@/lib/crm/estados'
@@ -90,10 +93,10 @@ async function reservadosAjenos(incluir: string[]): Promise<string[]> {
  *   · Externo: ninguna (no usa la agenda).
  */
 export async function filtroCitasDe(personal: Personal): Promise<FiltroCitas> {
-  if (personal.rol === 'direccion') return { modo: 'todo' }
-  if (personal.rol === 'externo') return { modo: 'ninguno' }
+  if (esDireccion(personal.rol)) return { modo: 'todo' }
+  if (!puede(personal.rol, 'agenda.ver')) return { modo: 'ninguno' }
   const al = await alcancesDe(personal)
-  if (personal.rol === 'coordinacion' || personal.rol === 'asistencia') {
+  if (categoriaAlcance(personal.rol) === 'sin_reservados') {
     const ajenos = await reservadosAjenos(al.solicitudesActivas)
     return ajenos.length === 0 ? { modo: 'todo' } : { modo: 'or', expresion: `solicitud_id.is.null,solicitud_id.not.in.(${ajenos.join(',')})` }
   }
@@ -376,8 +379,8 @@ export async function marcarCita(personal: Personal, cita: CitaFila, resultado: 
  * la primera persona activa de asistencia, luego coordinación, luego Dirección.
  */
 export async function responsableTareaCancelacion(personal: Pick<Personal, 'id' | 'rol'> | null): Promise<string | null> {
-  if (personal && (personal.rol === 'asistencia' || personal.rol === 'coordinacion')) return personal.id
-  for (const rol of ['asistencia', 'coordinacion', 'direccion']) {
+  if (personal && asumeTareaDeCancelacion(personal.rol)) return personal.id
+  for (const rol of ORDEN_RESPONSABLE_CANCELACION) {
     const { data, error } = await supabase
       .from('crm_personal').select('id').eq('rol', rol).eq('activo', true)
       .order('created_at', { ascending: true }).order('id', { ascending: true }).limit(1)
@@ -455,7 +458,7 @@ export async function cancelarCita(
 export async function citasParaPantalla(personal: Personal, citas: CitaVista[]) {
   const porCaso = new Map<string, boolean>()
   // Dirección gestiona todas: no se consulta caso por caso (evita registrar «ver_reservado» por un listado).
-  if (personal.rol !== 'direccion') {
+  if (!esDireccion(personal.rol)) {
     for (const id of new Set(citas.map((c) => c.solicitud_id).filter((x): x is string => !!x))) {
       porCaso.set(id, await puedeGestionarCita(personal, { solicitud_id: id }))
     }
@@ -474,7 +477,7 @@ export async function citasParaPantalla(personal: Personal, citas: CitaVista[]) 
     abogado_id: c.abogado_id,
     nombre: c.nombre,
     motivo_cancelacion: c.motivo_cancelacion,
-    gestionable: personal.rol === 'direccion' || (c.solicitud_id ? (porCaso.get(c.solicitud_id) ?? false) : sinCaso),
+    gestionable: esDireccion(personal.rol) || (c.solicitud_id ? (porCaso.get(c.solicitud_id) ?? false) : sinCaso),
   }))
 }
 

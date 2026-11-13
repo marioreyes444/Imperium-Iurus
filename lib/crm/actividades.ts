@@ -10,8 +10,8 @@ import type { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { esTablaAusente, jsonError, respuestaErrorBD } from '@/lib/crm/errores'
 import {
-  CrmNoDisponibleError, cronologiaDe, esMiembroActivo, esTitularActivo, puedeActuarSobreTarea, puedeCrearActividad,
-  puedeSerResponsable, puedeVerSolicitud, recibeJuridicas, type AccionTarea, type NivelVista, type Personal,
+  CrmNoDisponibleError, categoriaAlcance, cronologiaDe, esMiembroActivo, esTitularActivo, puedeActuarSobreTarea, puedeCrearActividad,
+  puedeSerResponsable, puedeVerSolicitud, recibeJuridicas, veActividadesSinCaso, veTareasDeSusCasos, type AccionTarea, type NivelVista, type Personal,
 } from '@/lib/crm/permisos'
 import { alcancesDe } from '@/lib/crm/visibilidad'
 import { registrar } from '@/lib/crm/bitacora'
@@ -185,10 +185,10 @@ const FORMATO_CURSOR_TAREAS = /^([AB])\|(\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}
 
 /** Condiciones OR de visibilidad de tareas: las mismas reglas que los casos (4.2). */
 async function visibilidadTareas(personal: Personal, modo: 'mias' | 'todas'): Promise<string[]> {
-  if (modo === 'mias' || personal.rol === 'externo') return [`responsable_id.eq.${personal.id}`]
-  if (personal.rol === 'direccion') return []
+  if (modo === 'mias' || !veTareasDeSusCasos(personal.rol)) return [`responsable_id.eq.${personal.id}`]
+  if (categoriaAlcance(personal.rol) === 'todo') return []
   const al = await alcancesDe(personal)
-  if (personal.rol === 'coordinacion' || personal.rol === 'asistencia') {
+  if (categoriaAlcance(personal.rol) === 'sin_reservados') {
     let q = supabase.from('crm_solicitudes').select('id').eq('reserva_reforzada', true).limit(1000)
     if (al.solicitudesActivas.length > 0) q = q.not('id', 'in', `(${al.solicitudesActivas.join(',')})`)
     const { data, error } = await q
@@ -301,7 +301,7 @@ async function validarResponsable(responsableId: string, c: CasoActividad, jurid
   if (!ficha || !esRol(ficha.rol)) return 'Elige una persona activa del personal'
   const miembroActivo = await esMiembroActivo(ficha.id, c.id)
   if (!puedeSerResponsable({ rol: ficha.rol, activo: ficha.activo }, { miembroActivo, juridica, casoReservado: c.reserva_reforzada })) {
-    return juridica && ficha.rol === 'asistencia'
+    return juridica && !recibeJuridicas(ficha.rol)
       ? 'Una tarea jurídica no se asigna a asistencia'
       : 'Esa persona no puede ser responsable de tareas de este caso'
   }
@@ -326,7 +326,7 @@ export async function crearActividad(personal: Personal, d: ActividadCrear): Pro
   const esTarea = d.tipo === 'tarea'
   const juridica = d.es_juridica || d.es_plazo_juridico
   if (!puedeCrearActividad(personal, nivel, { tipo: d.tipo, es_juridica: d.es_juridica, es_plazo_juridico: d.es_plazo_juridico })) {
-    return fallo(jsonError(403, juridica && personal.rol === 'asistencia'
+    return fallo(jsonError(403, juridica && !recibeJuridicas(personal.rol)
       ? 'Asistencia no registra notas ni plazos jurídicos'
       : 'No tienes permiso para registrar esta actividad'))
   }
@@ -390,7 +390,7 @@ export async function actualizarTarea(personal: Personal, id: string, cambio: Ca
   // Visibilidad: quien no puede ver la actividad recibe 404 (no 403).
   const nivel = a.solicitud_id
     ? await puedeVerSolicitud(personal, a.solicitud_id)
-    : (personal.rol === 'direccion' || personal.rol === 'coordinacion' ? 'completo' : null)
+    : (veActividadesSinCaso(personal.rol) ? 'completo' : null)
   const modo = cronologiaDe(nivel)
   const propia = a.responsable_id === personal.id || (!!personal.user_id && a.autor_id === personal.user_id)
   if (!modo || (a.es_juridica && !recibeJuridicas(personal.rol)) || (modo === 'propia' && !propia)) {

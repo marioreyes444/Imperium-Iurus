@@ -8,7 +8,7 @@ import { esTablaAusente, jsonError, respuestaErrorBD } from '@/lib/crm/errores'
 import { recalcularEtapa } from '@/lib/crm/etapas'
 import { hoyGuayaquil } from '@/lib/crm/fechas'
 import { marcarPrimeraRespuesta } from '@/lib/crm/solicitudes'
-import type { Personal } from '@/lib/crm/permisos'
+import { puedeCambiarEstado, type Personal } from '@/lib/crm/permisos'
 import type { Rol } from '@/lib/crm/roles'
 import type { ESTADOS_SOLICITUD } from '@/lib/crm/schemas'
 
@@ -84,23 +84,13 @@ export function transicionValida(desde: Estado, hacia: Estado): boolean {
   return TRANSICIONES[desde].includes(hacia) && !SOLO_POR_FUNCION.has(`${desde}>${hacia}`)
 }
 
-/** Sección 8.1: quién puede hacer cada cambio de estado. */
+/**
+ * Sección 8.1: ¿puede el rol hacer este cambio? La transición debe existir en la tabla (dato de este
+ * archivo) y la decisión por rol la toma `puedeCambiarEstado` de lib/crm/permisos.ts.
+ */
 export function rolPuedeCambiar(rol: Rol, ctx: ContextoEstado, hacia: Estado): boolean {
-  const desde = ctx.estado
-  if (!transicionValida(desde, hacia)) return false
-
-  if (esReapertura(desde)) return rol === 'direccion'
-  if (hacia === 'descartada') {
-    if (rol === 'direccion') return true
-    // Coordinación y asistencia solo descartan un envío por validar.
-    return (rol === 'coordinacion' || rol === 'asistencia') && desde === 'nueva' && ctx.requiereValidacion
-  }
-  if (hacia === 'aceptada_pendiente_asignacion') return rol === 'direccion'
-  if (hacia === 'en_espera' || hacia === 'cerrada' || (desde === 'en_espera' && hacia === 'en_curso')) {
-    return rol === 'direccion' || rol === 'coordinacion' || ctx.esTitularActivo
-  }
-  // Hacia calificación, información pendiente, consulta agendada, propuesta enviada o pendiente de aceptación.
-  return rol === 'direccion' || rol === 'coordinacion' || rol === 'asistencia'
+  if (!transicionValida(ctx.estado, hacia)) return false
+  return puedeCambiarEstado(rol, { desde: ctx.estado, hacia, requiereValidacion: ctx.requiereValidacion, esTitularActivo: ctx.esTitularActivo })
 }
 
 /** Estados que ofrece «Cambiar estado» a esa persona: solo los permitidos desde el actual. */

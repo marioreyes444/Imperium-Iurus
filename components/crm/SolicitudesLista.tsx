@@ -28,12 +28,14 @@ type Props = {
   estados: { valor: string; etiqueta: string }[]
   urgencias: { valor: string; etiqueta: string }[]
   areas: { valor: string; etiqueta: string }[]
+  /** Solo Dirección y Coordinación reciben la lista: sin ella no hay filtro «titular». */
+  titulares?: { valor: string; etiqueta: string }[]
   puedeCrear: boolean
   puedeEditar: boolean
   puedeCambiarEstado: boolean
 }
 
-export default function SolicitudesLista({ estados, urgencias, areas, puedeCrear, puedeEditar, puedeCambiarEstado }: Props) {
+export default function SolicitudesLista({ estados, urgencias, areas, titulares, puedeCrear, puedeEditar, puedeCambiarEstado }: Props) {
   const router = useRouter()
   const [panelAbierto, setPanelAbierto] = useState(false)
   const [mensaje, setMensaje] = useState<string | null>(null)
@@ -43,6 +45,7 @@ export default function SolicitudesLista({ estados, urgencias, areas, puedeCrear
     { nombre: 'urgencia', etiqueta: 'Urgencia', tipo: 'select', opciones: urgencias },
     // El filtro por área solo aparece cuando el catálogo E5 ya tiene datos.
     ...(areas.length > 0 ? [{ nombre: 'area', etiqueta: 'Área', tipo: 'select' as const, opciones: areas }] : []),
+    ...(titulares && titulares.length > 0 ? [{ nombre: 'titular', etiqueta: 'Titular', tipo: 'select' as const, opciones: titulares }] : []),
   ]
 
   const columnas: Columna<FilaSolicitud>[] = [

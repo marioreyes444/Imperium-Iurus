@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import CrmNav from '@/components/crm/CrmNav'
 import CrmTopBar from '@/components/crm/CrmTopBar'
 import BotonSalir from '@/components/crm/BotonSalir'
-import { getSesionCrm, menuDe } from '@/lib/crm/permisos'
+import { getSesionCrm, menuDe, veEnlacePanelAdmin } from '@/lib/crm/permisos'
 import { ROL_LABEL } from '@/lib/crm/roles'
 import { contadoresMenu } from '@/lib/crm/contadores'
 import { contarAsignacionesPendientes } from '@/lib/crm/asignacion'
@@ -48,7 +48,7 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
   const contadores = porConfirmar > 0 ? { ...contadoresBase, '/admin/crm/asignaciones': porConfirmar } : contadoresBase
   return (
     <div className="flex min-h-screen bg-primary">
-      <CrmNav items={menuDe(personal.rol, { conAsignaciones: porConfirmar > 0 })} contadores={contadores} mostrarPanelAdmin={personal.rol === 'direccion'} />
+      <CrmNav items={menuDe(personal.rol, { conAsignaciones: porConfirmar > 0 })} contadores={contadores} mostrarPanelAdmin={veEnlacePanelAdmin(personal.rol)} />
       <div className="ml-56 min-w-0 flex-1">
         <CrmTopBar nombre={`${personal.nombres} ${personal.apellidos}`} rolEtiqueta={ROL_LABEL[personal.rol]} />
         <main>{children}</main>

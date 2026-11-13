@@ -1,5 +1,5 @@
 import SolicitudForm from '@/components/crm/SolicitudForm'
-import { personalDePagina } from '@/lib/crm/permisos'
+import { personalDePagina, puedeMarcarReserva, puedeQuitarReserva } from '@/lib/crm/permisos'
 import { obtenerCatalogo } from '@/lib/crm/catalogo'
 import { alcancesDe, contactosVisiblesEntre } from '@/lib/crm/visibilidad'
 import { supabase } from '@/lib/supabase'
@@ -41,8 +41,8 @@ export default async function NuevaSolicitudPage({ searchParams }: { searchParam
       catalogo={{ areas: catalogo.areas.map((a) => ({ id: a.id, nombre: a.nombre })), servicios: catalogo.servicios.map((s) => ({ id: s.id, area_id: s.area_id, nombre: s.nombre })) }}
       urgencias={Object.entries(ETIQUETA_URGENCIA).map(([valor, etiqueta]) => ({ valor, etiqueta }))}
       canales={CANALES}
-      puedeMarcarReserva={personal.rol === 'direccion' || personal.rol === 'coordinacion'}
-      puedeQuitarReserva={personal.rol === 'direccion'}
+      puedeMarcarReserva={puedeMarcarReserva(personal.rol)}
+      puedeQuitarReserva={puedeQuitarReserva(personal.rol)}
       contactoInicial={contactoInicial}
     />
   )

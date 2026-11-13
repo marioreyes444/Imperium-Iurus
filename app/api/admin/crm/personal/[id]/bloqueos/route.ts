@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import {
-  autorizarApi, puedeGestionarBloqueos, puedeVerHorario, puedeVerSolicitud, type Personal,
+  autorizarApi, esDireccion, puedeGestionarBloqueos, puedeVerHorario, puedeVerSolicitud, type Personal,
 } from '@/lib/crm/permisos'
 import { jsonError, respuestaErrorBD, respuestaExcepcion, respuestaZod } from '@/lib/crm/errores'
 import { bloqueoBorrarSchema, bloqueoCrearSchema, uuidSchema } from '@/lib/crm/schemas'
@@ -15,7 +15,7 @@ type Ctx = { params: Promise<{ id: string }> }
 
 /** R-53: de las citas afectadas, quien no ve el caso no recibe su código. */
 async function paraPersona(personal: Personal, citas: CitaAfectada[]) {
-  if (personal.rol === 'direccion') return citas.map((c) => ({ ...c, reservada: false }))
+  if (esDireccion(personal.rol)) return citas.map((c) => ({ ...c, reservada: false }))
   return Promise.all(citas.map(async (c) => {
     if (!c.solicitud_id) return { ...c, reservada: false }
     const nivel = await puedeVerSolicitud(personal, c.solicitud_id)
