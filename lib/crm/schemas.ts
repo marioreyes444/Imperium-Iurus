@@ -2,7 +2,8 @@
 import { z } from 'zod'
 import { ROLES } from '@/lib/crm/roles'
 import { ACCIONES_BITACORA } from '@/lib/crm/bitacora'
-import { LIMITE_LISTADO, LIMITE_LISTADO_MAX } from '@/lib/crm/config'
+import { LIMITE_LISTADO, LIMITE_LISTADO_MAX, MAX_DIAS_REPORTE } from '@/lib/crm/config'
+import { diasEntre, esFechaValida } from '@/lib/crm/fechas'
 import { normalizarCorreo, normalizarTelefono } from '@/lib/crm/normalizar'
 import { TIPOS_IDENTIFICACION, validarIdentificacion } from '@/lib/crm/identificacion'
 
@@ -599,4 +600,43 @@ export const expedienteSchema = z.object({
 
 export const notificacionesQuerySchema = paginacion.extend({
   leidas: z.enum(['true', 'false', 'todas']).default('false'),
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENTREGA 5 — Control: reportes, exportación y turnos
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Reportes y exportación: período obligatorio (máx. MAX_DIAS_REPORTE días) y los mismos filtros. */
+export const reportesQuerySchema = z
+  .object({
+    desde: fechaISO.refine(esFechaValida, 'Fecha inválida'),
+    hasta: fechaISO.refine(esFechaValida, 'Fecha inválida'),
+    area: uuidSchema.optional(),
+    canal: z.enum(CANALES, { errorMap: () => ({ message: 'Canal no válido' }) }).optional(),
+    responsable: uuidSchema.optional(),
+  })
+  .refine((d) => d.hasta >= d.desde, { message: 'El período no es válido', path: ['hasta'] })
+  .refine((d) => d.hasta < d.desde || diasEntre(d.desde, d.hasta) + 1 <= MAX_DIAS_REPORTE, {
+    message: `El período no puede pasar de ${MAX_DIAS_REPORTE} días`,
+    path: ['hasta'],
+  })
+export type ReportesQuery = z.infer<typeof reportesQuerySchema>
+
+export const TIPOS_TURNO = ['semana', 'fin_de_semana', 'feriado'] as const
+
+export const turnoCrearSchema = z
+  .object({
+    personal_id: uuidSchema,
+    tipo: z.enum(TIPOS_TURNO, { errorMap: () => ({ message: 'Tipo no válido' }) }),
+    desde: fechaHoraLocal,
+    hasta: fechaHoraLocal,
+  })
+  .refine((t) => t.hasta > t.desde, { message: 'El fin debe ser posterior al inicio', path: ['hasta'] })
+
+export const turnoBorrarSchema = z.object({ turno_id: uuidSchema })
+
+export const turnosQuerySchema = paginacion.extend({
+  vigencia: z.enum(['vigentes', 'terminados']).optional(),
+  tipo: z.enum(TIPOS_TURNO).optional(),
+  persona: uuidSchema.optional(),
 })

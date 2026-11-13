@@ -491,3 +491,22 @@ Convenciones:
 - Avisos solo al personal (nunca al cliente); push solo para la solicitud crítica. Casos reservados: solo Dirección y miembros activos del equipo.
 - `/admin/agenda` (panel admin) cancela con motivo y origen vía `crm_cancelar_cita`; no reactiva citas canceladas ni concluidas.
 - Pendiente: función atómica en la base para reemplazar el horario (hoy se borra e inserta con restauración best-effort).
+
+### Entrega 5 — Control (cierra el módulo E6)
+
+| Pieza | Dónde |
+|-------|-------|
+| Objetivos de primer contacto R-43: horas hábiles y feriados, **funciones puras** (se prueban sin base) | `lib/crm/objetivos.ts` (`evaluarObjetivo`, `minutosHabilesEntre`, `sumarMinutosHabiles`); constantes en `config.ts` (`OBJETIVOS_PRIMER_CONTACTO`, `HORARIO_HABIL`, topes) |
+| Tablero completo (casos por estado, vencimientos R-42, objetivos, carga) | `lib/crm/tablero.ts` (`obtenerTableroCompleto`); el nivel lo da `nivelTablero(rol)` de `permisos.ts` |
+| Reportes (agregación en el servidor, columnas mínimas, tope) | `lib/crm/reportes.ts`, `GET /api/admin/crm/reportes`, `/admin/crm/reportes` |
+| Exportación CSV (R-53/R-54) | `lib/crm/exportar.ts`, `GET /api/admin/crm/exportar` |
+| Turnos del abogado de guardia (R-16) | `lib/crm/turnos.ts`, `/api/admin/crm/turnos`, `/admin/crm/turnos` |
+| Guía de pruebas y pendientes acumulados | `docs/E6_PRUEBAS_CRM.md` |
+
+Convenciones:
+- Tablero: Dirección y Coordinación ven todo (Coordinación sin reservados ajenos); asociado, lo de sus casos y su propia carga; asistencia y externo, el básico. La carga sale de `crm_v_carga_personal` tal cual (número real, para respetar la capacidad al proponer); no se muestran los casos reservados que la componen. Si los objetivos llegan al tope (500), se escribe «500 o más».
+- Objetivos: crítica = 60 min corridos; alta 2 h, media 8 h, ordinaria 9 h hábiles (lunes a viernes 09:00–18:00, sin `configuracion.festivos`). Sin `primera_respuesta_at`: incumplida si el plazo venció, «en curso» si no.
+- Reportes y exportación: período obligatorio (≤ 366 días), filtros área, canal y responsable. **Responsable = último titular** del caso (fila de titular más reciente entre `pendiente_confirmacion`, `activo`, `finalizado`). Cada bloque se cuenta antes de leerlo: más de 5000 filas → 422 (`REPORTE_EXCEDE_TOPE` / `EXPORTACION_EXCEDE_TOPE`), nunca resultados parciales. La visibilidad va EN la consulta (`aplicarAlcance`, y `aplicarAlcanceEmbebido` para tablas hijas de `crm_solicitudes`). El asociado no entra a `/reportes`.
+- CSV: UTF-8 con BOM, separador `;`, decimales con coma, `'` delante de celdas que empiezan con `= + - @ \t \r`. Sin descripción, notas, expediente ni datos de contacto (ni el nombre). Cada exportación se registra en `crm_bitacora` (`exportar`: filtros y número de filas, nunca los datos); si no se puede registrar, no se entrega.
+- Turnos: solo abogados activos; se permiten cruces entre personas distintas, no de la misma persona; solo se borran los que no han terminado (bitácora: `actualizar` con `{ eliminado: true }`). R-16 avisa a Dirección y a los abogados de turno vigente (panel y correo; push solo al panel admin); sin turno vigente avisa solo a Dirección.
+- Pendientes del módulo: ver `docs/E6_PRUEBAS_CRM.md` (invitación por correo, horario no atómico, push al personal E7, horas hábiles supuestas, `/mis-citas`, revisión de E2, comparaciones de rol fuera de `permisos.ts`, filtro «titular» del listado de solicitudes, restricción de cruces de turnos en la base).

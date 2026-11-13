@@ -116,6 +116,10 @@ export const ACCIONES = {
   'agenda.ver':        ['direccion', 'coordinacion', 'asistencia', 'asociado'],
   'tareas.ver':        ROLES,
   'avisos.ver':        ROLES,
+  // Entrega 5. El asociado NO entra a reportes: ve su carga en su tablero.
+  'reportes.ver':      ['direccion', 'coordinacion'],
+  'exportar.csv':      ['direccion', 'coordinacion'],
+  'turnos.gestionar':  ['direccion', 'coordinacion'],
 } as const satisfies Record<string, readonly Rol[]>
 
 export type Accion = keyof typeof ACCIONES
@@ -137,7 +141,7 @@ export type SeccionMenu = {
   href: string
   label: string
   icono: 'tablero' | 'solicitudes' | 'contactos' | 'validacion' | 'duplicados' | 'usuarios' | 'bitacora' | 'personal' | 'asignaciones'
-    | 'agenda' | 'tareas' | 'avisos'
+    | 'agenda' | 'tareas' | 'avisos' | 'reportes' | 'turnos'
 }
 
 const SECCIONES: (SeccionMenu & { accion: Accion })[] = [
@@ -151,6 +155,8 @@ const SECCIONES: (SeccionMenu & { accion: Accion })[] = [
   { href: '/admin/crm/tareas',      label: 'Tareas',      icono: 'tareas',      accion: 'tareas.ver' },
   { href: '/admin/crm/avisos',      label: 'Avisos',      icono: 'avisos',      accion: 'avisos.ver' },
   { href: '/admin/crm/personal',    label: 'Personal',    icono: 'personal',    accion: 'personal.ver' },
+  { href: '/admin/crm/reportes',    label: 'Reportes',    icono: 'reportes',    accion: 'reportes.ver' },
+  { href: '/admin/crm/turnos',      label: 'Turnos',      icono: 'turnos',      accion: 'turnos.gestionar' },
   { href: '/admin/crm/usuarios', label: 'Usuarios',  icono: 'usuarios', accion: 'usuarios.gestionar' },
   { href: '/admin/crm/bitacora', label: 'Historial', icono: 'bitacora', accion: 'bitacora.ver' },
 ]
@@ -487,3 +493,29 @@ export async function autorizadosParaAviso(solicitudId: string | null, personalI
     return new Set()
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENTREGA 5 — Control. Toda decisión de permiso de la entrega vive aquí.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Tablero:
+ *   · `completo`: Dirección y Coordinación (casos por estado, vencimientos, objetivos y carga de todos).
+ *   · `propio`: asociado, lo mismo pero solo lo suyo (incluida su propia carga).
+ *   · `basico`: asistencia y externo conservan el tablero de la Entrega 1.
+ */
+export type NivelTablero = 'completo' | 'propio' | 'basico'
+
+export function nivelTablero(rol: Rol): NivelTablero {
+  if (rol === 'direccion' || rol === 'coordinacion') return 'completo'
+  if (rol === 'asociado') return 'propio'
+  return 'basico'
+}
+
+/**
+ * Reportes, exportación y turnos: Dirección y Coordinación. Qué casos entran lo decide `alcancesDe`
+ * (Coordinación no ve reservados salvo los de su equipo activo), no estos permisos.
+ */
+export const puedeVerReportes = (rol: Rol) => puede(rol, 'reportes.ver')
+export const puedeExportar = (rol: Rol) => puede(rol, 'exportar.csv')
+export const puedeGestionarTurnos = (rol: Rol) => puede(rol, 'turnos.gestionar')

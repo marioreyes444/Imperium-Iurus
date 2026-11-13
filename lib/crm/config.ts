@@ -26,3 +26,26 @@ export const MAX_DIAS_DISPONIBILIDAD = 31
  * No dependen del horario de ningún abogado.
  */
 export const HORARIO_HABIL = { dias: [1, 2, 3, 4, 5], inicio: '09:00', fin: '18:00' } as const
+
+// ─── Control (Entrega 5) ────────────────────────────────────────────────────
+
+/**
+ * R-43: objetivo de primer contacto por urgencia.
+ *   · `naturales`: minutos corridos, sin horario hábil ni feriados (la crítica no espera al horario).
+ *   · `habiles`: minutos dentro de HORARIO_HABIL, sin contar los feriados de `configuracion.festivos`.
+ * Ordinaria = «1 día hábil» = 9 horas hábiles (09:00–18:00).
+ */
+export const OBJETIVOS_PRIMER_CONTACTO = {
+  critica:   { tipo: 'naturales', minutos: 60 },
+  alta:      { tipo: 'habiles',   minutos: 2 * 60 },
+  media:     { tipo: 'habiles',   minutos: 8 * 60 },
+  ordinaria: { tipo: 'habiles',   minutos: 9 * 60 },
+} as const
+
+/** Período máximo de un reporte o exportación (días, ambos extremos incluidos). */
+export const MAX_DIAS_REPORTE = 366
+/** Tope de filas por conjunto de datos en reportes y exportación: si se supera, 422 (nunca resultados parciales). */
+export const TOPE_FILAS_REPORTE = 5000
+export const TOPE_FILAS_EXPORTAR = 5000
+/** Tablero: tope de solicitudes evaluadas para los objetivos de atención. */
+export const TOPE_OBJETIVOS_TABLERO = 500

@@ -50,6 +50,47 @@ export function aplicarAlcance<Q>(consulta: Q, alcance: Alcance, colId = 'id', e
   return q as unknown as Q
 }
 
+type FiltrableEmbebido = {
+  in: (columna: string, valores: readonly string[]) => any
+  eq: (columna: string, valor: boolean) => any
+  or: (filtros: string, opciones: { referencedTable: string }) => any
+}
+
+/**
+ * Igual que `aplicarAlcance`, pero para una tabla HIJA de crm_solicitudes leída con un embebido
+ * `crm_solicitudes!inner(...)` (historial de estados, actividades…): el alcance se aplica EN la
+ * consulta sobre la solicitud embebida, de modo que las filas de casos que la persona no puede ver
+ * nunca salen de la base.
+ */
+export function aplicarAlcanceEmbebido<Q>(consulta: Q, alcance: Alcance, tabla = 'crm_solicitudes'): Q {
+  let q = consulta as unknown as FiltrableEmbebido
+  switch (alcance.modo) {
+    case 'todo':
+      break
+    case 'sin_reservados':
+      if (alcance.incluir.length > 0) q = q.or(`reserva_reforzada.eq.false,id.in.(${alcance.incluir.join(',')})`, { referencedTable: tabla })
+      else q = q.eq(`${tabla}.reserva_reforzada`, false)
+      break
+    case 'solo':
+      q = q.in(`${tabla}.id`, alcance.ids.length > 0 ? alcance.ids : [UUID_NULO])
+      break
+    case 'ninguno':
+      q = q.in(`${tabla}.id`, [UUID_NULO])
+      break
+  }
+  return q as unknown as Q
+}
+
+/** ¿Puede la persona (según su alcance de contactos) ver esta ficha? Solo para presentar datos ya leídos. */
+export function contactoVisibleEn(alcance: Alcance, contacto: { id: string; reserva_reforzada: boolean }): boolean {
+  switch (alcance.modo) {
+    case 'todo': return true
+    case 'sin_reservados': return !contacto.reserva_reforzada || alcance.incluir.includes(contacto.id)
+    case 'solo': return alcance.ids.includes(contacto.id)
+    case 'ninguno': return false
+  }
+}
+
 // ─── Pertenencia al equipo ──────────────────────────────────────────────────
 
 type FilaEquipo = {

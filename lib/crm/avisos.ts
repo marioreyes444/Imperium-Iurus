@@ -25,8 +25,9 @@ type Aviso = {
 
 const COLUMNAS_DESTINO = 'id,user_id,correo'
 
-async function personasActivas(filtro: { roles?: string[]; ids?: string[]; userIds?: string[] }): Promise<Destinatario[]> {
+async function personasActivas(filtro: { roles?: string[]; ids?: string[]; userIds?: string[]; soloAbogados?: boolean }): Promise<Destinatario[]> {
   let q = supabase.from('crm_personal').select(COLUMNAS_DESTINO).eq('activo', true).not('user_id', 'is', null)
+  if (filtro.soloAbogados) q = q.eq('es_abogado', true)
   if (filtro.roles) q = q.in('rol', filtro.roles)
   if (filtro.ids) q = q.in('id', filtro.ids.length > 0 ? filtro.ids : ['00000000-0000-0000-0000-000000000000'])
   if (filtro.userIds) q = q.in('user_id', filtro.userIds.length > 0 ? filtro.userIds : ['00000000-0000-0000-0000-000000000000'])
@@ -38,7 +39,7 @@ async function personasActivas(filtro: { roles?: string[]; ids?: string[]; userI
   return (data ?? []) as Destinatario[]
 }
 
-/** Personal con turno vigente ahora (crm_turnos), activo y con cuenta. */
+/** Abogados con turno vigente ahora (crm_turnos), activos y con cuenta. Sin turno vigente: lista vacía. */
 async function personalDeTurno(): Promise<Destinatario[]> {
   const ahora = new Date().toISOString()
   const { data: turnos, error } = await supabase
@@ -51,7 +52,7 @@ async function personalDeTurno(): Promise<Destinatario[]> {
     return []
   }
   const ids = [...new Set((turnos ?? []).map((t) => (t as { personal_id: string }).personal_id))]
-  return ids.length === 0 ? [] : personasActivas({ ids })
+  return ids.length === 0 ? [] : personasActivas({ ids, soloAbogados: true })
 }
 
 /**

@@ -493,3 +493,27 @@ export async function responsablesPosibles(solicitudId: string, juridica: boolea
     .filter((p) => esRol(p.rol) && puedeSerResponsable({ rol: p.rol, activo: p.activo }, { miembroActivo: activos.has(p.id), juridica, casoReservado: c.reserva_reforzada }))
     .map((p) => ({ id: p.id, nombre: `${p.nombres} ${p.apellidos}`, rol: p.rol }))
 }
+
+// ─── Entrega 5: conteos de vencimientos para el tablero ─────────────────────
+
+/**
+ * Tareas pendientes vencidas y por vencer en 7 días, con la MISMA visibilidad que la bandeja (4.2),
+ * aplicada en la consulta. `modo: 'todas'` = las de los casos que la persona ve.
+ */
+export async function contarVencimientos(personal: Personal, modo: 'mias' | 'todas'): Promise<{ vencidas: number; proximas_7_dias: number }> {
+  const vis = await visibilidadTareas(personal, modo)
+  const ahora = new Date()
+  const en7 = new Date(ahora.getTime() + 7 * 86_400_000).toISOString()
+  const base = () => {
+    let q = supabase.from('crm_actividades').select('id', { count: 'exact', head: true }).eq('tipo', 'tarea').eq('estado_tarea', 'pendiente')
+    if (!recibeJuridicas(personal.rol)) q = q.eq('es_juridica', false)
+    return combinarOr(q, vis)
+  }
+  const [vencidas, proximas] = await Promise.all([
+    base().lt('vence_at', ahora.toISOString()),
+    base().gte('vence_at', ahora.toISOString()).lt('vence_at', en7),
+  ])
+  if (vencidas.error) lanzar('conteo vencidas', vencidas.error)
+  if (proximas.error) lanzar('conteo próximas', proximas.error)
+  return { vencidas: vencidas.count ?? 0, proximas_7_dias: proximas.count ?? 0 }
+}
