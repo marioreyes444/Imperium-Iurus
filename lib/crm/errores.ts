@@ -32,6 +32,15 @@ export function esTablaAusente(error: ErrorBD | null | undefined): boolean {
 }
 
 /**
+ * Cruce de citas del mismo abogado (R-30): la ruta responde 409 «Esa hora acaba de ocuparse» con las
+ * horas libres actualizadas en `datos` (por eso se detecta antes de `respuestaErrorBD`).
+ */
+export function esCruceCita(error: ErrorBD | null | undefined): boolean {
+  if (!error) return false
+  return error.code === '23P01' && `${error.message ?? ''} ${error.details ?? ''}`.includes('citas_sin_cruce_abogado')
+}
+
+/**
  * Traduce un error de la base a una respuesta HTTP (sección 7).
  * Nunca devuelve `error.message` de Supabase al navegador.
  */

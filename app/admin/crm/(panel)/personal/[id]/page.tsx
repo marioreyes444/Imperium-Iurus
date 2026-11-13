@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { personalDePagina } from '@/lib/crm/permisos'
+import { personalDePagina, puedeVerHorario } from '@/lib/crm/permisos'
 import { ROL_LABEL, esRol } from '@/lib/crm/roles'
 import { uuidSchema } from '@/lib/crm/schemas'
 import { areasDe, cargaDe, obtenerFicha, puedeEditarFicha, puedeVerFicha } from '@/lib/crm/personal'
@@ -47,9 +47,10 @@ export default async function FichaPersonalPage({ params }: { params: Promise<{ 
         <p className="mt-2 font-montserrat text-xs text-text-muted">
           {esRol(ficha.rol) ? ROL_LABEL[ficha.rol] : ficha.rol}{!ficha.activo && ' · Inactivo'}
         </p>
-        {puedeEditarFicha(personal) && (
-          <div className="mt-4"><Link href={`/admin/crm/personal/${id}/editar`} className={BOTON_BARRA}>Editar</Link></div>
-        )}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {puedeEditarFicha(personal) && <Link href={`/admin/crm/personal/${id}/editar`} className={BOTON_BARRA}>Editar</Link>}
+          {puedeVerHorario(personal, id) && <Link href={`/admin/crm/personal/${id}/horario`} className={BOTON_BARRA}>Horario y ausencias</Link>}
+        </div>
       </div>
 
       <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">

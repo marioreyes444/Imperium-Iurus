@@ -439,3 +439,164 @@ export const reasignarSchema = z
     ...capacidad,
   })
   .refine(exigirMotivoCapacidad, { message: 'Indica el motivo para superar la capacidad', path: ['motivo_capacidad'] })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENTREGA 4 — Agenda y seguimiento: horarios, bloqueos, citas, actividades, expediente, avisos
+// ═══════════════════════════════════════════════════════════════════════════
+
+const horaHHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Hora inválida (HH:MM)')
+const minutos = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5))
+
+/** `YYYY-MM-DDTHH:MM` (hora de Guayaquil) tal como lo envía un campo datetime-local. */
+const fechaHoraLocal = z.string().regex(/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/, 'Fecha y hora inválidas')
+const fechaHoraLocalOpcional = z.preprocess(vacioANull, fechaHoraLocal.nullable().optional())
+
+const franjaSchema = z
+  .object({
+    dia_semana: z.number({ invalid_type_error: 'Día no válido' }).int().min(1, 'Día no válido').max(7, 'Día no válido'),
+    hora_inicio: horaHHMM,
+    hora_fin: horaHHMM,
+  })
+  .refine((f) => minutos(f.hora_fin) > minutos(f.hora_inicio), { message: 'La hora final debe ser posterior a la inicial', path: ['hora_fin'] })
+
+/** PUT de horarios: reemplaza la semana. Varias franjas por día (p. ej. para dejar libre el almuerzo). */
+export const horariosSchema = z.object({
+  franjas: z.array(franjaSchema).max(70, 'Demasiadas franjas').superRefine((franjas, ctx) => {
+    for (let i = 0; i < franjas.length; i++) {
+      for (let j = i + 1; j < franjas.length; j++) {
+        const a = franjas[i]
+        const b = franjas[j]
+        if (a.dia_semana === b.dia_semana
+          && minutos(a.hora_inicio) < minutos(b.hora_fin) && minutos(b.hora_inicio) < minutos(a.hora_fin)) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Esa franja se cruza con otra del mismo día', path: [j, 'hora_inicio'] })
+        }
+      }
+    }
+  }),
+})
+export type FranjaEntrada = z.infer<typeof franjaSchema>
+
+export const TIPOS_BLOQUEO = ['vacaciones', 'audiencia', 'permiso', 'otro'] as const
+
+export const bloqueoCrearSchema = z
+  .object({
+    desde: fechaHoraLocal,
+    hasta: fechaHoraLocal,
+    tipo: z.enum(TIPOS_BLOQUEO, { errorMap: () => ({ message: 'Tipo no válido' }) }).default('otro'),
+    motivo: textoOpcional(500),
+  })
+  .refine((b) => b.hasta > b.desde, { message: 'El fin debe ser posterior al inicio', path: ['hasta'] })
+
+export const bloqueoBorrarSchema = z.object({ bloqueo_id: uuidSchema })
+
+const duracionCita = z.coerce
+  .number({ invalid_type_error: 'Duración no válida' })
+  .int()
+  .min(15, 'Mínimo 15 minutos')
+  .max(480, 'Máximo 480 minutos')
+  .refine((d) => d % 15 === 0, 'Debe ser múltiplo de 15')
+
+export const disponibilidadQuerySchema = z
+  .object({
+    abogado_id: uuidSchema,
+    desde: fechaISO,
+    hasta: fechaISO,
+    duracion: duracionCita.optional(),
+    /** Cita que se está reagendando: no cuenta como ocupada. */
+    excluir: uuidSchema.optional(),
+  })
+  .refine((d) => d.hasta >= d.desde, { message: 'El rango no es válido', path: ['hasta'] })
+
+export const ORIGENES_CANCELACION = ['cliente', 'estudio', 'abogado'] as const
+
+/** La duración no se recibe: es DURACION_CITA_MIN (R-34). */
+export const citaCrearSchema = z.object({
+  solicitud_id: uuidSchema,
+  abogado_id: uuidSchema,
+  fecha: fechaISO,
+  hora: horaHHMM,
+  mensaje: textoOpcional(1000),
+  reagendada_de: uuidOpcional,
+})
+
+export const citaEditarSchema = z.discriminatedUnion('accion', [
+  /** Reagendar (fecha/hora) o asignar abogado a la misma cita. */
+  z.object({ accion: z.literal('reprogramar'), fecha: fechaISO, hora: horaHHMM, abogado_id: uuidSchema }),
+  z.object({ accion: z.literal('confirmar') }),
+  /** R-39: solo en citas cuya hora ya pasó. */
+  z.object({ accion: z.literal('marcar'), resultado: z.enum(['atendida', 'no_asistio'], { errorMap: () => ({ message: 'Resultado no válido' }) }) }),
+], { errorMap: () => ({ message: 'Acción no válida' }) })
+
+export const citaCancelarSchema = z.object({
+  origen: z.enum(ORIGENES_CANCELACION, { errorMap: () => ({ message: 'Indica quién cancela' }) }),
+  motivo: motivoObligatorio,
+})
+
+export const citasQuerySchema = z
+  .object({
+    desde: fechaISO.optional(),
+    hasta: fechaISO.optional(),
+    abogado_id: uuidSchema.optional(),
+    solicitud_id: uuidSchema.optional(),
+  })
+  .refine((d) => !!d.solicitud_id || (!!d.desde && !!d.hasta), { message: 'Indica el rango de fechas o la solicitud', path: ['desde'] })
+  .refine((d) => !d.desde || !d.hasta || d.hasta >= d.desde, { message: 'El rango no es válido', path: ['hasta'] })
+
+/** Tipos que el personal registra a mano; `cambio_estado`, `asignacion`, `cita` y `sistema` son automáticos. */
+export const TIPOS_ACTIVIDAD = ['llamada', 'reunion', 'mensaje', 'actuacion', 'tarea', 'nota'] as const
+/** `crm_actividades.canal` no tiene CHECK en la base: se limita aquí. Correo = tipo «mensaje» con canal «correo». */
+export const CANALES_ACTIVIDAD = ['telefono', 'whatsapp', 'correo', 'presencial', 'videollamada', 'otro'] as const
+
+export const actividadCrearSchema = z
+  .object({
+    solicitud_id: uuidSchema,
+    tipo: z.enum(TIPOS_ACTIVIDAD, { errorMap: () => ({ message: 'Tipo no válido' }) }),
+    canal: enumOpcional(CANALES_ACTIVIDAD),
+    descripcion: z.string({ required_error: 'Obligatoria' }).trim().min(2, 'Mínimo 2 caracteres').max(5000, 'Máximo 5000 caracteres'),
+    resultado: textoOpcional(2000),
+    es_juridica: z.boolean().optional().default(false),
+    responsable_id: uuidOpcional,
+    vence_at: fechaHoraLocalOpcional,
+    es_plazo_juridico: z.boolean().optional().default(false),
+  })
+  .superRefine((d, ctx) => {
+    if (d.tipo === 'tarea') {
+      if (!d.responsable_id) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Indica el responsable', path: ['responsable_id'] })
+      if (!d.vence_at) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Indica el vencimiento', path: ['vence_at'] })
+    } else if (d.es_plazo_juridico) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Un plazo jurídico es una tarea', path: ['es_plazo_juridico'] })
+    }
+  })
+export type ActividadCrear = z.infer<typeof actividadCrearSchema>
+
+export const actividadEditarSchema = z.discriminatedUnion('accion', [
+  z.object({ accion: z.literal('completar'), resultado: textoOpcional(2000) }),
+  z.object({ accion: z.literal('cancelar') }),
+  z.object({ accion: z.literal('verificar_plazo') }),
+  z.object({ accion: z.literal('reprogramar'), vence_at: fechaHoraLocalOpcional, responsable_id: uuidOpcional }),
+], { errorMap: () => ({ message: 'Acción no válida' }) })
+
+export const actividadesQuerySchema = paginacion.extend({
+  /** Cronología de un caso. */
+  solicitud_id: uuidSchema.optional(),
+  /** Bandeja de tareas: las propias o todas las de los casos visibles. */
+  tareas: z.enum(['mias', 'todas']).optional(),
+  estado: z.enum(['pendiente', 'hecha', 'cancelada', 'todas']).default('pendiente'),
+})
+
+const textoExpediente = (max: number) => textoOpcional(max)
+export const expedienteSchema = z.object({
+  /** null = el expediente aún no existe. */
+  updated_at: z.string().max(64).nullable(),
+  numero_proceso: textoExpediente(80),
+  autoridad: textoExpediente(200),
+  contraparte: textoExpediente(200),
+  etapa_procesal: textoExpediente(200),
+  estado_procesal: textoExpediente(200),
+  ultimo_acto: textoExpediente(1000),
+  ultimo_acto_at: fechaOpcional,
+})
+
+export const notificacionesQuerySchema = paginacion.extend({
+  leidas: z.enum(['true', 'false', 'todas']).default('false'),
+})

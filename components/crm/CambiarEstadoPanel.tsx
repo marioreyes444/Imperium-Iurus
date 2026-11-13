@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import PanelAccion from '@/components/crm/PanelAccion'
 import { CLASE_ETIQUETA, CLASE_INPUT } from '@/components/crm/estilos'
 
@@ -26,6 +27,7 @@ export default function CambiarEstadoPanel({ solicitudId, estados, onHecho, onCa
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [campos, setCampos] = useState<Record<string, string>>({})
+  const [conCitas, setConCitas] = useState(false)
 
   useEffect(() => {
     if (estados) return
@@ -63,6 +65,8 @@ export default function CambiarEstadoPanel({ solicitudId, estados, onHecho, onCa
       if (!res.ok) {
         if (cuerpo.campos) setCampos(cuerpo.campos as Record<string, string>)
         if (!cuerpo.campos || cuerpo.codigo) setError(typeof cuerpo.error === 'string' ? cuerpo.error : 'No se pudo cambiar el estado.')
+        // R-18: con citas futuras activas se ofrece ir a cancelarlas primero.
+        setConCitas(cuerpo.codigo === 'R-18')
         return
       }
       onHecho(`Estado cambiado a «${elegida.etiqueta}».`)
@@ -128,6 +132,11 @@ export default function CambiarEstadoPanel({ solicitudId, estados, onHecho, onCa
             </>
           )}
         </>
+      )}
+      {conCitas && (
+        <p className="font-montserrat text-xs text-text-muted">
+          <Link href={`/admin/crm/solicitudes/${solicitudId}?tab=citas`} className="focus-gold text-gold underline underline-offset-2">Ver las citas del caso para cancelarlas</Link>
+        </p>
       )}
     </PanelAccion>
   )

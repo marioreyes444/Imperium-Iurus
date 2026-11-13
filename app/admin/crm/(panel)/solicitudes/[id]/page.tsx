@@ -3,7 +3,9 @@ import { notFound, redirect } from 'next/navigation'
 import SolicitudAcciones from '@/components/crm/SolicitudAcciones'
 import { IndicadorEstado, IndicadorUrgencia } from '@/components/crm/IndicadoresSolicitud'
 import { formatoFechaHora } from '@/components/crm/formato'
-import { personalDePagina } from '@/lib/crm/permisos'
+import {
+  esTitularActivo, personalDePagina, puedeCrearActividad, puedeEditarExpediente, puedeGestionarCitasDe, puedeVerExpediente, recibeJuridicas,
+} from '@/lib/crm/permisos'
 import { uuidSchema } from '@/lib/crm/schemas'
 import { detalleSolicitud, type DetalleSolicitud } from '@/lib/crm/detalles'
 import { ETIQUETA_ESTADO, FASE_ESTADO, type Estado } from '@/lib/crm/estados'
@@ -11,6 +13,19 @@ import EquipoPanel, { type MiembroVista } from '@/components/crm/EquipoPanel'
 import {
   equipoDeSolicitud, ETIQUETA_ESTADO_EQUIPO, ETIQUETA_MOTIVO_REASIGNACION, ETIQUETA_ROL_EQUIPO,
 } from '@/lib/crm/asignacion'
+import CronologiaPanel from '@/components/crm/CronologiaPanel'
+import CitasLista from '@/components/crm/CitasLista'
+import ExpedienteForm from '@/components/crm/ExpedienteForm'
+import Franja from '@/components/crm/Franja'
+import { BOTON_BARRA } from '@/components/crm/estilos'
+import { citasParaPantalla, listarCitas } from '@/lib/crm/citas'
+import { CAMPOS_EXPEDIENTE, obtenerExpediente } from '@/lib/crm/expediente'
+
+const AVISO_E4: Record<string, string> = {
+  cita_agendada: 'Cita agendada.',
+  cita_reagendada: 'Cita actualizada.',
+  tarea_creada: 'Tarea creada.',
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -55,13 +70,44 @@ export default async function SolicitudPage({
 
   const { solicitud: s, contacto, empresa, historial, registro, estados_permitidos, permisos, solo_lectura, nivel } = detalle
   const completa = nivel === 'completo' || nivel === 'sin_juridico'
-  const pestana = completa && (tab === 'historial' || tab === 'equipo') ? tab : 'resumen'
+  // Pestañas según el nivel (4.2): expediente solo con acceso completo; el externo ve resumen y su cronología.
+  const pestanas: [string, string][] = completa
+    ? [['resumen', 'Resumen'], ['equipo', 'Equipo'], ['cronologia', 'Cronología'], ['citas', 'Citas'],
+      ...(puedeVerExpediente(nivel) ? [['expediente', 'Expediente'] as [string, string]] : []), ['historial', 'Historial']]
+    : nivel === 'reducido' ? [['resumen', 'Resumen'], ['cronologia', 'Cronología']] : []
+  const pestana = pestanas.some(([c]) => c === tab) ? (tab as string) : 'resumen'
   const estado = s.estado as Estado
   const rol = personal.rol
   const cerrada = estado === 'cerrada'
   const admiteEquipo = ['aceptada_pendiente_asignacion', 'asignada', 'en_curso', 'en_espera'].includes(estado)
   const admiteReasignar = ['asignada', 'en_curso', 'en_espera'].includes(estado)
   const abierta = !cerrada && estado !== 'descartada'
+
+  // ── Entrega 4: citas, cronología y expediente ──────────────────────────────
+  const puedeAgendar = abierta && puedeGestionarCitasDe(personal, nivel)
+  let citas: Awaited<ReturnType<typeof citasParaPantalla>> = []
+  let expediente: { valores: Record<string, string | null>; updatedAt: string | null; editable: boolean } | null = null
+  if (pestana === 'citas') {
+    try {
+      citas = await citasParaPantalla(personal, await listarCitas(personal, { solicitudId: s.id }))
+    } catch {
+      redirect('/admin/crm')
+    }
+  }
+  if (pestana === 'expediente') {
+    try {
+      const ex = await obtenerExpediente(s.id)
+      const titular = await esTitularActivo(personal.id, s.id)
+      expediente = {
+        valores: Object.fromEntries(CAMPOS_EXPEDIENTE.map((c) => [c, ex?.[c] ?? null])),
+        updatedAt: ex?.updated_at ?? null,
+        editable: !cerrada && puedeEditarExpediente(personal, titular),
+      }
+    } catch {
+      redirect('/admin/crm')
+    }
+  }
+  const avisoE4 = aviso ? AVISO_E4[aviso] : undefined
 
   let miembros: MiembroVista[] = []
   if (pestana === 'equipo') {
@@ -109,9 +155,11 @@ export default async function SolicitudPage({
         </p>
       )}
 
-      {completa && (
-        <nav aria-label="Secciones de la solicitud" className="flex gap-6 border-b border-border">
-          {([['resumen', 'Resumen'], ['equipo', 'Equipo'], ['historial', 'Historial']] as const).map(([clave, etiqueta]) => (
+      {avisoE4 && <Franja tipo="exito">{avisoE4}</Franja>}
+
+      {pestanas.length > 0 && (
+        <nav aria-label="Secciones de la solicitud" className="flex flex-wrap gap-x-6 gap-y-2 border-b border-border">
+          {pestanas.map(([clave, etiqueta]) => (
             <Link
               key={clave}
               href={`/admin/crm/solicitudes/${s.id}?tab=${clave}`}
@@ -171,6 +219,45 @@ export default async function SolicitudPage({
           miembros={miembros}
           motivosReasignacion={Object.entries(ETIQUETA_MOTIVO_REASIGNACION).map(([valor, etiqueta]) => ({ valor, etiqueta }))}
         />
+      )}
+
+      {pestana === 'cronologia' && (
+        <CronologiaPanel
+          solicitudId={s.id}
+          puedeRegistrar={!cerrada && puedeCrearActividad(personal, nivel, { tipo: rol === 'externo' ? 'nota' : 'llamada', es_juridica: false, es_plazo_juridico: false })}
+          permiteJuridico={recibeJuridicas(rol) && (nivel === 'completo' || nivel === 'reducido')}
+          soloNotas={rol === 'externo'}
+          puedeCrearTareas={!cerrada && puedeCrearActividad(personal, nivel, { tipo: 'tarea', es_juridica: false, es_plazo_juridico: false })}
+        />
+      )}
+
+      {pestana === 'citas' && (
+        <div className="space-y-4">
+          {puedeAgendar && (
+            <Link href={`/admin/crm/citas/nueva?solicitud=${s.id}`} className={BOTON_BARRA}>+ Agendar cita</Link>
+          )}
+          <CitasLista
+            citas={citas}
+            vacio={puedeAgendar ? 'Este caso no tiene citas. Usa «Agendar cita» para crear la primera.' : 'Este caso no tiene citas.'}
+          />
+          {puedeAgendar && citas.some((c) => c.estado === 'cancelada') && (
+            <div className="font-montserrat text-xs text-text-muted">
+              <p>Para reemplazar una cita cancelada (la nueva quedará vinculada a ella):</p>
+              <ul className="mt-2 list-inside list-disc">
+                {citas.filter((c) => c.estado === 'cancelada').slice(-5).map((c) => (
+                  <li key={c.id}>
+                    {c.fecha} {c.hora}{' — '}
+                    <Link href={`/admin/crm/citas/nueva?solicitud=${s.id}&reagendada_de=${c.id}`} className="focus-gold text-gold underline underline-offset-2">Agendar una nueva en su lugar</Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {pestana === 'expediente' && expediente && (
+        <ExpedienteForm solicitudId={s.id} inicial={expediente.valores} updatedAt={expediente.updatedAt} editable={expediente.editable} />
       )}
 
       {pestana === 'historial' && (

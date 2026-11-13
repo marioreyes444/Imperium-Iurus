@@ -112,6 +112,10 @@ export const ACCIONES = {
   'personal.ver':      ['direccion', 'coordinacion'],
   // Confirmar o rechazar la PROPIA asignación: lo decide la fila, no el rol (por eso la ven todos).
   'asignaciones.ver':  ROLES,
+  // Entrega 4. Agenda: asociado ve la suya. Tareas y avisos: cada quien los suyos.
+  'agenda.ver':        ['direccion', 'coordinacion', 'asistencia', 'asociado'],
+  'tareas.ver':        ROLES,
+  'avisos.ver':        ROLES,
 } as const satisfies Record<string, readonly Rol[]>
 
 export type Accion = keyof typeof ACCIONES
@@ -133,6 +137,7 @@ export type SeccionMenu = {
   href: string
   label: string
   icono: 'tablero' | 'solicitudes' | 'contactos' | 'validacion' | 'duplicados' | 'usuarios' | 'bitacora' | 'personal' | 'asignaciones'
+    | 'agenda' | 'tareas' | 'avisos'
 }
 
 const SECCIONES: (SeccionMenu & { accion: Accion })[] = [
@@ -142,6 +147,9 @@ const SECCIONES: (SeccionMenu & { accion: Accion })[] = [
   { href: '/admin/crm/validacion',  label: 'Validación',  icono: 'validacion',  accion: 'validacion.ver' },
   { href: '/admin/crm/duplicados',  label: 'Duplicados',  icono: 'duplicados',  accion: 'duplicados.ver' },
   { href: '/admin/crm/asignaciones', label: 'Mis asignaciones', icono: 'asignaciones', accion: 'asignaciones.ver' },
+  { href: '/admin/crm/agenda',      label: 'Agenda',      icono: 'agenda',      accion: 'agenda.ver' },
+  { href: '/admin/crm/tareas',      label: 'Tareas',      icono: 'tareas',      accion: 'tareas.ver' },
+  { href: '/admin/crm/avisos',      label: 'Avisos',      icono: 'avisos',      accion: 'avisos.ver' },
   { href: '/admin/crm/personal',    label: 'Personal',    icono: 'personal',    accion: 'personal.ver' },
   { href: '/admin/crm/usuarios', label: 'Usuarios',  icono: 'usuarios', accion: 'usuarios.gestionar' },
   { href: '/admin/crm/bitacora', label: 'Historial', icono: 'bitacora', accion: 'bitacora.ver' },
@@ -279,5 +287,203 @@ export async function puedeVerSolicitud(personal: Personal, solicitudId: string)
       if (equipo.some((f) => f.estado === 'pendiente_confirmacion')) return 'resumen'
       return null
     }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENTREGA 4 — Agenda y seguimiento. Toda decisión de permiso de la entrega vive aquí.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Filas de equipo de una persona en un caso (para titular activo / miembro activo). */
+async function filasEquipo(personalId: string, solicitudId: string): Promise<{ rol: string; estado: string }[]> {
+  const { data, error } = await supabase
+    .from('crm_solicitud_equipo')
+    .select('rol,estado')
+    .eq('solicitud_id', solicitudId)
+    .eq('personal_id', personalId)
+  if (error) {
+    if (esTablaAusente(error)) throw new CrmNoDisponibleError()
+    console.error('[crm/permisos] equipo (E4)', error.code)
+    return []
+  }
+  return (data ?? []) as { rol: string; estado: string }[]
+}
+
+export async function esTitularActivo(personalId: string, solicitudId: string): Promise<boolean> {
+  return (await filasEquipo(personalId, solicitudId)).some((f) => f.rol === 'titular' && f.estado === 'activo')
+}
+
+export async function esMiembroActivo(personalId: string, solicitudId: string): Promise<boolean> {
+  return (await filasEquipo(personalId, solicitudId)).some((f) => f.estado === 'activo')
+}
+
+// ─── Horario y bloqueos (matriz 4.3) ────────────────────────────────────────
+
+/** Horario semanal: Dirección edita; coordinación, asistencia y el propio abogado lo ven. */
+export function puedeVerHorario(personal: Personal, fichaId: string): boolean {
+  return personal.rol === 'direccion' || personal.rol === 'coordinacion' || personal.rol === 'asistencia' || personal.id === fichaId
+}
+export function puedeEditarHorario(personal: Personal): boolean {
+  return personal.rol === 'direccion'
+}
+
+/** Bloqueos (ausencias): Dirección y coordinación; el asociado, los suyos. Los ve quien ve el horario. */
+export function puedeGestionarBloqueos(personal: Personal, fichaId: string): boolean {
+  return personal.rol === 'direccion' || personal.rol === 'coordinacion' || (personal.rol === 'asociado' && personal.id === fichaId)
+}
+
+// ─── Citas ──────────────────────────────────────────────────────────────────
+
+/** Agenda: Dirección, coordinación y asistencia ven a todos los abogados; el asociado, solo la suya. */
+export function abogadosVisiblesEnAgenda(personal: Personal): 'todos' | 'propio' | 'ninguno' {
+  if (personal.rol === 'direccion' || personal.rol === 'coordinacion' || personal.rol === 'asistencia') return 'todos'
+  if (personal.rol === 'asociado') return 'propio'
+  return 'ninguno'
+}
+
+/**
+ * Agendar, reagendar y cancelar citas de un caso: D, C, A; el asociado en sus casos (nivel completo).
+ * `nivel` es el resultado de `puedeVerSolicitud` sobre el caso de la cita.
+ */
+export function puedeGestionarCitasDe(personal: Personal, nivel: NivelVista | null): boolean {
+  if (!nivel) return false
+  if (personal.rol === 'direccion' || personal.rol === 'coordinacion') return nivel === 'completo'
+  if (personal.rol === 'asistencia') return nivel === 'sin_juridico'
+  if (personal.rol === 'asociado') return nivel === 'completo'
+  return false
+}
+
+/** Cita sin caso vinculado (p. ej. reserva web cuyo ingreso al CRM falló): solo D, C y A. */
+export function puedeGestionarCitaSinCaso(personal: Personal): boolean {
+  return personal.rol === 'direccion' || personal.rol === 'coordinacion' || personal.rol === 'asistencia'
+}
+
+/**
+ * Quién puede VER una cita: quien ve su caso con acceso completo o sin jurídico, quien la atiende
+ * como abogado y, si no tiene caso, D, C y A.
+ */
+export async function puedeVerCita(personal: Personal, cita: { solicitud_id: string | null; abogado_id: string | null }): Promise<boolean> {
+  if (cita.abogado_id && cita.abogado_id === personal.id) return true
+  if (!cita.solicitud_id) return puedeGestionarCitaSinCaso(personal)
+  const nivel = await puedeVerSolicitud(personal, cita.solicitud_id)
+  return nivel === 'completo' || nivel === 'sin_juridico'
+}
+
+/** Permiso para gestionar una cita concreta (con o sin caso). */
+export async function puedeGestionarCita(personal: Personal, cita: { solicitud_id: string | null }): Promise<boolean> {
+  if (!cita.solicitud_id) return puedeGestionarCitaSinCaso(personal)
+  return puedeGestionarCitasDe(personal, await puedeVerSolicitud(personal, cita.solicitud_id))
+}
+
+// ─── Actividades, tareas y plazos ───────────────────────────────────────────
+
+/** Asistencia nunca crea ni recibe actividades jurídicas (es_juridica). */
+export const recibeJuridicas = (rol: Rol) => rol !== 'asistencia'
+
+/** Cronología según el nivel: completa, sin jurídicas (asistencia) o solo lo propio (externo). */
+export function cronologiaDe(nivel: NivelVista | null): 'completa' | 'sin_juridico' | 'propia' | null {
+  if (nivel === 'completo') return 'completa'
+  if (nivel === 'sin_juridico') return 'sin_juridico'
+  if (nivel === 'reducido') return 'propia'
+  return null
+}
+
+/**
+ * Crear una actividad en un caso (matriz 4.3):
+ *   · Tareas y seguimientos: D, C, A (no jurídicas), asociado en sus casos.
+ *   · Notas jurídicas: D, C, asociado y externo en sus casos. Asistencia nunca.
+ *   · Un plazo jurídico cuenta como jurídico: asistencia no lo crea.
+ */
+export function puedeCrearActividad(
+  personal: Personal,
+  nivel: NivelVista | null,
+  a: { tipo: string; es_juridica: boolean; es_plazo_juridico: boolean },
+): boolean {
+  if (!nivel || nivel === 'resumen') return false
+  const juridica = a.es_juridica || a.es_plazo_juridico
+  switch (personal.rol) {
+    case 'direccion':
+    case 'coordinacion':
+    case 'asociado':
+      return nivel === 'completo'
+    case 'asistencia':
+      return nivel === 'sin_juridico' && !juridica
+    case 'externo':
+      // Vista reducida: solo notas en sus casos; no crea tareas.
+      return nivel === 'reducido' && a.tipo === 'nota'
+  }
+}
+
+/**
+ * Quién puede ser responsable de una tarea de un caso: personal activo que vea el caso (D; C y A si
+ * no es reservado; o miembro activo del equipo). Una tarea jurídica nunca va a asistencia.
+ */
+export function puedeSerResponsable(
+  ficha: { rol: Rol; activo: boolean },
+  opciones: { miembroActivo: boolean; juridica: boolean; casoReservado: boolean },
+): boolean {
+  if (!ficha.activo) return false
+  if (opciones.juridica && !recibeJuridicas(ficha.rol)) return false
+  if (ficha.rol === 'direccion' || opciones.miembroActivo) return true
+  if (opciones.casoReservado) return false
+  return ficha.rol === 'coordinacion' || ficha.rol === 'asistencia'
+}
+
+export type AccionTarea = 'completar' | 'cancelar' | 'verificar_plazo' | 'reprogramar'
+
+/**
+ * Acciones sobre una tarea:
+ *   · Completar: el responsable, o D/C.
+ *   · Cancelar y reprogramar: D/C.
+ *   · Verificar un plazo jurídico (R-41): titular activo o Dirección.
+ */
+export function puedeActuarSobreTarea(
+  personal: Personal,
+  accion: AccionTarea,
+  t: { esResponsable: boolean; esTitularActivo: boolean; esPlazoJuridico: boolean },
+): boolean {
+  const dc = personal.rol === 'direccion' || personal.rol === 'coordinacion'
+  switch (accion) {
+    case 'completar':
+      return dc || t.esResponsable
+    case 'cancelar':
+    case 'reprogramar':
+      return dc
+    case 'verificar_plazo':
+      return t.esPlazoJuridico && (personal.rol === 'direccion' || t.esTitularActivo)
+  }
+}
+
+// ─── Expediente ─────────────────────────────────────────────────────────────
+
+/** Asistencia y externo no reciben datos del expediente (4.2). */
+export const puedeVerExpediente = (nivel: NivelVista | null) => nivel === 'completo'
+
+/** Editar el expediente: D, C y el titular activo. */
+export function puedeEditarExpediente(personal: Personal, esTitular: boolean): boolean {
+  return personal.rol === 'direccion' || personal.rol === 'coordinacion' || esTitular
+}
+
+// ─── Avisos (R-53) ──────────────────────────────────────────────────────────
+
+/**
+ * De una lista de fichas, cuáles pueden recibir un aviso sobre un caso. Si el caso tiene reserva
+ * reforzada, solo Dirección y quien esté ACTIVO en su equipo. Sin caso, todas. Nunca lanza.
+ */
+export async function autorizadosParaAviso(solicitudId: string | null, personalIds: string[]): Promise<Set<string>> {
+  const ids = [...new Set(personalIds)]
+  if (!solicitudId || ids.length === 0) return new Set(ids)
+  try {
+    const { data: sol } = await supabase.from('crm_solicitudes').select('reserva_reforzada').eq('id', solicitudId).maybeSingle()
+    if (!sol || sol.reserva_reforzada !== true) return new Set(ids)
+    const [{ data: fichas }, { data: equipo }] = await Promise.all([
+      supabase.from('crm_personal').select('id,rol').in('id', ids),
+      supabase.from('crm_solicitud_equipo').select('personal_id').eq('solicitud_id', solicitudId).eq('estado', 'activo').in('personal_id', ids),
+    ])
+    const activos = new Set(((equipo ?? []) as { personal_id: string }[]).map((e) => e.personal_id))
+    return new Set(((fichas ?? []) as { id: string; rol: string }[]).filter((f) => f.rol === 'direccion' || activos.has(f.id)).map((f) => f.id))
+  } catch (e) {
+    console.error('[crm/permisos] autorizados para aviso', e instanceof Error ? e.name : 'error')
+    return new Set()
   }
 }

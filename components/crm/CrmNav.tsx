@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ClipboardCheck, Copy, FileText, History, LayoutDashboard, LayoutPanelLeft, ShieldCheck, UserCog, Users, UsersRound } from 'lucide-react'
+import { Bell, CalendarDays, ClipboardCheck, Copy, FileText, History, LayoutDashboard, LayoutPanelLeft, ListTodo, ShieldCheck, UserCog, Users, UsersRound } from 'lucide-react'
 import type { SeccionMenu } from '@/lib/crm/permisos'
 
 const ICONOS = {
@@ -15,6 +15,9 @@ const ICONOS = {
   bitacora: History,
   personal: UserCog,
   asignaciones: ClipboardCheck,
+  agenda: CalendarDays,
+  tareas: ListTodo,
+  avisos: Bell,
 } as const
 
 type Props = {
