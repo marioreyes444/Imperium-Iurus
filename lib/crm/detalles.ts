@@ -143,6 +143,45 @@ export async function detalleDuplicado(personal: Personal, id: string) {
 
 export type DetalleSolicitud = NonNullable<Awaited<ReturnType<typeof detalleSolicitud>>>
 
+/**
+ * Nivel «resumen» (asignación por confirmar) y «reducido» (externo): SOLO código, área, servicio, urgencia
+ * y descripción (sección 4). Todo lo demás —contacto, canal, origen, motivos, conflicto, reserva,
+ * tiempos— se anula para que ni la API ni la pantalla lo reciban. `area_principal_id` y `servicio_id`
+ * se conservan solo para resolver sus nombres en el servidor.
+ */
+function resumirSolicitud(s: SolicitudFila): SolicitudFila {
+  return {
+    id: s.id,
+    codigo: s.codigo,
+    contacto_id: '',
+    empresa_id: null,
+    canal_origen: '',
+    origen_tabla: null,
+    origen_id: null,
+    area_principal_id: s.area_principal_id,
+    servicio_id: s.servicio_id,
+    descripcion: s.descripcion,
+    objetivo_cliente: null,
+    modalidad: null,
+    urgencia: s.urgencia,
+    estado: s.estado,
+    motivo_estado: null,
+    estado_at: '',
+    conflicto_revision: 'pendiente',
+    requiere_validacion: false,
+    reserva_reforzada: false,
+    resultado_cierre: null,
+    pendientes_cierre: null,
+    fecha_recepcion: '',
+    primera_respuesta_at: null,
+    asignada_at: null,
+    cerrada_at: null,
+    created_by: null,
+    created_at: '',
+    updated_at: '',
+  }
+}
+
 type ResumenContacto = Pick<ContactoFila, 'id' | 'tipo' | 'nombres' | 'apellidos' | 'razon_social' | 'correo' | 'telefono' | 'etapa_relacion' | 'reserva_reforzada'>
 
 /**
@@ -230,7 +269,7 @@ export async function detalleSolicitud(personal: Personal, id: string) {
   const { data: titular } = await supabase
     .from('crm_solicitud_equipo').select('id')
     .eq('solicitud_id', id).eq('personal_id', personal.id).eq('rol', 'titular').eq('estado', 'activo').limit(1)
-  const ctx: ContextoEstado = { estado, requiereValidacion: s.requiere_validacion, esTitularActivo: (titular ?? []).length > 0 }
+  const ctx: ContextoEstado = { estado, requiereValidacion: s.requiere_validacion, esTitularActivo: (titular ?? []).length > 0, conflicto: s.conflicto_revision }
   const rol = personal.rol
   const cerrada = estado === 'cerrada'
   const abierta = completa && !cerrada
@@ -238,7 +277,12 @@ export async function detalleSolicitud(personal: Personal, id: string) {
 
   return {
     nivel,
-    solicitud: { ...s, area, servicio, estado_etiqueta: ETIQUETA_ESTADO[estado] ?? s.estado },
+    solicitud: {
+      ...(completa ? s : resumirSolicitud(s)),
+      area,
+      servicio,
+      estado_etiqueta: ETIQUETA_ESTADO[estado] ?? s.estado,
+    },
     contacto,
     empresa,
     historial,

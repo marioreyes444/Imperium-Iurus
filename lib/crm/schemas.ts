@@ -346,3 +346,96 @@ export const solicitudesQuerySchema = paginacion.extend({
   validacion: z.enum(['true']).optional(),
   contacto: uuidSchema.optional(),
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENTREGA 3 — Asignación: personal, conflictos y equipo
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const ROLES_EQUIPO = ['titular', 'suplente', 'coordinador', 'apoyo', 'perito'] as const
+export const MOTIVOS_REASIGNACION = [
+  'ausencia', 'vacaciones', 'exceso_carga', 'impedimento',
+  'conflicto_interes', 'especialidad_complementaria', 'inactividad', 'otro',
+] as const
+
+export const personalQuerySchema = paginacion.extend({
+  q: z.string().max(80).optional(),
+  rol: z.enum(ROLES).optional(),
+  abogados: z.enum(['true']).optional(),
+})
+
+const fechaOpcional = z.preprocess(
+  vacioANull,
+  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida (AAAA-MM-DD)').nullable().optional(),
+)
+
+/** Datos profesionales, habilitación y capacidad. El rol y `activo` se cambian en Usuarios (solo Dirección). */
+export const personalEditarSchema = z
+  .object({
+    updated_at: z.string().min(1, 'Falta la versión del registro').max(64),
+    es_abogado: z.boolean().optional(),
+    matricula: textoOpcional(40),
+    habilitacion_verificada: z.boolean().optional(),
+    especialidad: textoOpcional(120),
+    capacidad_maxima: z.preprocess(
+      (v) => (v === '' ? null : v),
+      z.number({ invalid_type_error: 'Número no válido' }).int('Debe ser un entero').positive('Debe ser mayor que cero').max(1000).nullable().optional(),
+    ),
+    fecha_vinculacion: fechaOpcional,
+    acuerdo_confidencialidad: z.boolean().optional(),
+    ciudad: textoOpcional(80),
+  })
+  .refine(
+    (d) => Object.entries(d).some(([k, v]) => k !== 'updated_at' && v !== undefined),
+    { message: 'No hay cambios que guardar', path: ['_'] },
+  )
+
+/** Reemplaza las áreas de referencia de una persona. */
+export const personalAreasSchema = z.object({
+  areas: z
+    .array(z.object({
+      area_id: uuidSchema,
+      rol_referencia: z.enum(['titular', 'suplente', 'miembro'], { errorMap: () => ({ message: 'Rol de referencia no válido' }) }),
+      competencia_acreditada: z.boolean().optional(),
+    }))
+    .max(100, 'Demasiadas áreas')
+    .refine((a) => new Set(a.map((x) => x.area_id)).size === a.length, 'Un área no puede repetirse'),
+})
+
+export const conflictoSchema = z.object({
+  resultado: z.enum(['sin_conflicto', 'con_conflicto'], { errorMap: () => ({ message: 'Resultado no válido' }) }),
+  detalle: z.string({ required_error: 'Indica el detalle de la revisión' }).trim().min(5, 'Mínimo 5 caracteres').max(2000, 'Máximo 2000 caracteres'),
+})
+
+export const equipoProponerSchema = z.object({
+  personal_id: uuidSchema,
+  rol: z.enum(ROLES_EQUIPO, { errorMap: () => ({ message: 'Rol de equipo no válido' }) }),
+  funciones: textoOpcional(500),
+})
+
+/** Capacidad: si la base responde R-26, la pantalla reintenta con `supera_capacidad` y su motivo. */
+const capacidad = {
+  supera_capacidad: z.boolean().optional(),
+  motivo_capacidad: z.preprocess(vacioANull, z.string().min(5, 'Mínimo 5 caracteres').max(500, 'Máximo 500 caracteres').nullable().optional()),
+}
+const exigirMotivoCapacidad = (d: { supera_capacidad?: boolean; motivo_capacidad?: string | null }) =>
+  !d.supera_capacidad || !!d.motivo_capacidad
+
+export const equipoAprobarSchema = z
+  .object(capacidad)
+  .refine(exigirMotivoCapacidad, { message: 'Indica el motivo para superar la capacidad', path: ['motivo_capacidad'] })
+
+export const equipoResponderSchema = z
+  .object({ acepta: z.boolean({ required_error: 'Indica si aceptas', invalid_type_error: 'Valor no válido' }), motivo })
+  .refine((d) => d.acepta || !!d.motivo, { message: 'Indica el motivo del rechazo (mínimo 5 caracteres)', path: ['motivo'] })
+
+export const equipoFinalizarSchema = z.object({ motivo: motivoObligatorio })
+
+export const reasignarSchema = z
+  .object({
+    nuevo_titular_id: uuidSchema,
+    motivo: z.enum(MOTIVOS_REASIGNACION, { errorMap: () => ({ message: 'Motivo no válido' }) }),
+    detalle: textoOpcional(1000),
+    entrega_documentada: z.boolean().optional(),
+    ...capacidad,
+  })
+  .refine(exigirMotivoCapacidad, { message: 'Indica el motivo para superar la capacidad', path: ['motivo_capacidad'] })

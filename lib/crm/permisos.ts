@@ -108,6 +108,10 @@ export const ACCIONES = {
   'usuarios.gestionar': ['direccion'],
   'bitacora.ver':      ['direccion'],
   'bitacora.ver_caso': ['direccion', 'coordinacion', 'asociado'],
+  // Entrega 3: la lista de personal es de Dirección y Coordinación; cada quien ve su propia ficha.
+  'personal.ver':      ['direccion', 'coordinacion'],
+  // Confirmar o rechazar la PROPIA asignación: lo decide la fila, no el rol (por eso la ven todos).
+  'asignaciones.ver':  ROLES,
 } as const satisfies Record<string, readonly Rol[]>
 
 export type Accion = keyof typeof ACCIONES
@@ -128,7 +132,7 @@ export function requireRol(personal: Personal, roles: readonly Rol[]): boolean {
 export type SeccionMenu = {
   href: string
   label: string
-  icono: 'tablero' | 'solicitudes' | 'contactos' | 'validacion' | 'duplicados' | 'usuarios' | 'bitacora'
+  icono: 'tablero' | 'solicitudes' | 'contactos' | 'validacion' | 'duplicados' | 'usuarios' | 'bitacora' | 'personal' | 'asignaciones'
 }
 
 const SECCIONES: (SeccionMenu & { accion: Accion })[] = [
@@ -137,12 +141,22 @@ const SECCIONES: (SeccionMenu & { accion: Accion })[] = [
   { href: '/admin/crm/contactos',   label: 'Contactos',   icono: 'contactos',   accion: 'contactos.ver' },
   { href: '/admin/crm/validacion',  label: 'Validación',  icono: 'validacion',  accion: 'validacion.ver' },
   { href: '/admin/crm/duplicados',  label: 'Duplicados',  icono: 'duplicados',  accion: 'duplicados.ver' },
+  { href: '/admin/crm/asignaciones', label: 'Mis asignaciones', icono: 'asignaciones', accion: 'asignaciones.ver' },
+  { href: '/admin/crm/personal',    label: 'Personal',    icono: 'personal',    accion: 'personal.ver' },
   { href: '/admin/crm/usuarios', label: 'Usuarios',  icono: 'usuarios', accion: 'usuarios.gestionar' },
   { href: '/admin/crm/bitacora', label: 'Historial', icono: 'bitacora', accion: 'bitacora.ver' },
 ]
 
-export function menuDe(rol: Rol): SeccionMenu[] {
-  return SECCIONES.filter((s) => puede(rol, s.accion)).map(({ href, label, icono }) => ({ href, label, icono }))
+const HREF_ASIGNACIONES = '/admin/crm/asignaciones'
+
+/**
+ * Menú de un rol. «Mis asignaciones» aparece solo si la persona tiene asignaciones por confirmar
+ * (cualquier rol: la regla es que la fila sea de su cuenta).
+ */
+export function menuDe(rol: Rol, opciones: { conAsignaciones?: boolean } = {}): SeccionMenu[] {
+  return SECCIONES
+    .filter((s) => puede(rol, s.accion) && (s.href !== HREF_ASIGNACIONES || opciones.conAsignaciones))
+    .map(({ href, label, icono }) => ({ href, label, icono }))
 }
 
 // ─── Autorización de rutas API ──────────────────────────────────────────────

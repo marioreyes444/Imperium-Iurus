@@ -5,6 +5,7 @@ import BotonSalir from '@/components/crm/BotonSalir'
 import { getSesionCrm, menuDe } from '@/lib/crm/permisos'
 import { ROL_LABEL } from '@/lib/crm/roles'
 import { contadoresMenu } from '@/lib/crm/contadores'
+import { contarAsignacionesPendientes } from '@/lib/crm/asignacion'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,10 +44,11 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
   }
 
   const { personal } = sesion
-  const contadores = await contadoresMenu(personal)
+  const [contadoresBase, porConfirmar] = await Promise.all([contadoresMenu(personal), contarAsignacionesPendientes(personal)])
+  const contadores = porConfirmar > 0 ? { ...contadoresBase, '/admin/crm/asignaciones': porConfirmar } : contadoresBase
   return (
     <div className="flex min-h-screen bg-primary">
-      <CrmNav items={menuDe(personal.rol)} contadores={contadores} mostrarPanelAdmin={personal.rol === 'direccion'} />
+      <CrmNav items={menuDe(personal.rol, { conAsignaciones: porConfirmar > 0 })} contadores={contadores} mostrarPanelAdmin={personal.rol === 'direccion'} />
       <div className="ml-56 min-w-0 flex-1">
         <CrmTopBar nombre={`${personal.nombres} ${personal.apellidos}`} rolEtiqueta={ROL_LABEL[personal.rol]} />
         <main>{children}</main>

@@ -76,6 +76,8 @@ export type ContextoEstado = {
   requiereValidacion: boolean
   /** La persona es titular ACTIVO del caso. */
   esTitularActivo: boolean
+  /** Revisión de conflictos (R-20, R-21). Si se indica, «Cambiar estado» la tiene en cuenta al ofrecer opciones. */
+  conflicto?: 'pendiente' | 'sin_conflicto' | 'con_conflicto' | string
 }
 
 export function transicionValida(desde: Estado, hacia: Estado): boolean {
@@ -103,7 +105,11 @@ export function rolPuedeCambiar(rol: Rol, ctx: ContextoEstado, hacia: Estado): b
 
 /** Estados que ofrece «Cambiar estado» a esa persona: solo los permitidos desde el actual. */
 export function estadosPermitidos(rol: Rol, ctx: ContextoEstado): Estado[] {
-  return TRANSICIONES[ctx.estado].filter((h) => rolPuedeCambiar(rol, ctx, h))
+  return TRANSICIONES[ctx.estado]
+    .filter((h) => rolPuedeCambiar(rol, ctx, h))
+    // R-21: con conflicto el caso solo puede descartarse. R-20: sin «sin conflicto» no se acepta el encargo.
+    .filter((h) => ctx.conflicto !== 'con_conflicto' || h === 'descartada' || esReapertura(ctx.estado))
+    .filter((h) => h !== 'aceptada_pendiente_asignacion' || ctx.conflicto === undefined || ctx.conflicto === 'sin_conflicto')
 }
 
 /** R-13: espera, descarte, cierre y reapertura exigen motivo en ese mismo cambio. */

@@ -52,6 +52,68 @@ async function personalDeTurno(): Promise<Destinatario[]> {
   return (personas ?? []) as Destinatario[]
 }
 
+/** Inserta avisos del PANEL ya enviados. Nunca lanza. */
+async function insertarAvisosPanel(
+  destinatarios: string[],
+  aviso: { tipo: string; solicitudId: string; titulo: string; url: string },
+): Promise<void> {
+  const unicos = [...new Set(destinatarios)]
+  if (unicos.length === 0) return
+  const ahora = new Date().toISOString()
+  const { error } = await supabase.from('crm_notificaciones').insert(
+    unicos.map((destinatario_id) => ({
+      destinatario_id,
+      canal: 'panel',
+      tipo: aviso.tipo,
+      solicitud_id: aviso.solicitudId,
+      titulo: aviso.titulo,
+      url: aviso.url,
+      estado: 'enviada',
+      enviada_at: ahora,
+    })),
+  )
+  if (error) console.error('[crm/avisos] no se guardaron los avisos del panel', aviso.tipo, error.code)
+}
+
+/**
+ * Asignación por confirmar: aviso SOLO al panel de la persona asignada (el push personal queda para el E7).
+ * `userId` es la cuenta (auth.users.id) de la persona asignada. Nunca lanza.
+ */
+export async function avisarAsignacionPorConfirmar(a: { solicitudId: string; codigo: string; userId: string | null }): Promise<void> {
+  try {
+    if (!a.userId) return
+    await insertarAvisosPanel([a.userId], {
+      tipo: 'asignacion_por_confirmar',
+      solicitudId: a.solicitudId,
+      titulo: `Nueva asignación en ${a.codigo}`,
+      url: '/admin/crm/asignaciones',
+    })
+  } catch (e) {
+    console.error('[crm/avisos] asignación por confirmar', e instanceof Error ? e.name : 'error')
+  }
+}
+
+/**
+ * Asignación rechazada: aviso al panel de Dirección y de quien propuso (este solo si el caso no tiene
+ * reserva reforzada). Nunca lanza.
+ */
+export async function avisarAsignacionRechazada(a: {
+  solicitudId: string; codigo: string; reservada: boolean; propuestoPor: string | null
+}): Promise<void> {
+  try {
+    const destinos = (await direccionActiva()).map((d) => d.user_id)
+    if (!a.reservada && a.propuestoPor) destinos.push(a.propuestoPor)
+    await insertarAvisosPanel(destinos, {
+      tipo: 'asignacion_rechazada',
+      solicitudId: a.solicitudId,
+      titulo: `Asignación rechazada en ${a.codigo}`,
+      url: `/admin/crm/solicitudes/${a.solicitudId}?tab=equipo`,
+    })
+  } catch (e) {
+    console.error('[crm/avisos] asignación rechazada', e instanceof Error ? e.name : 'error')
+  }
+}
+
 /**
  * R-16: aviso inmediato por una solicitud crítica a Dirección y al personal de turno, sin esperar la
  * calificación. Nunca lanza.
