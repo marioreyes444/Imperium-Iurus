@@ -469,3 +469,25 @@ Convenciones:
 - Los formularios web guardan el nombre completo en `nombres` (`apellidos = null`); la ficha muestra «Completar apellidos».
 - `primera_respuesta_at` se fija una sola vez (`marcarPrimeraRespuesta`): al salir de «nueva» o con una actividad de contacto (la ruta de actividades es de la Entrega 4).
 - Pendiente: push personal (E7), correo de avisos (Entrega 4), invitación por correo de usuarios, catálogo E5 en DEV.
+
+### Entrega 4 — Agenda y seguimiento
+
+| Pieza | Dónde |
+|-------|-------|
+| Horas libres (algoritmo 11.1 + feriados de `configuracion.festivos`, solo lectura) | `lib/crm/disponibilidad.ts` (`horasLibres`, `comprobarHora`) |
+| Horario semanal y bloqueos (R-45: citas afectadas se listan, no se cancelan) | `lib/crm/horarios.ts` |
+| Citas: visibilidad, agendar, reagendar/asignar abogado, confirmar, marcar, cancelar (`crm_cancelar_cita`) | `lib/crm/citas.ts` |
+| Cronología, tareas, plazos y bandeja R-42 | `lib/crm/actividades.ts` |
+| Expediente procesal | `lib/crm/expediente.ts` |
+| Avisos panel + correo (Resend) | `lib/crm/avisos.ts`, `lib/crm/correo.ts` |
+| Constantes (`DURACION_CITA_MIN`, paso 30, antelación 60, `HORARIO_HABIL`) | `lib/crm/config.ts` |
+| Pantallas | `/admin/crm/agenda`, `/citas/nueva`, `/citas/[id]/reagendar`, `/personal/[id]/horario`, `/tareas`, `/tareas/nueva`, `/avisos`; pestañas `cronologia`, `citas`, `expediente` del caso |
+
+Convenciones:
+- La duración de la cita es fija (60 min); POST citas y el reagendado repiten la comprobación de disponibilidad; un cruce de la base (`citas_sin_cruce_abogado`) responde 409 con las horas libres en `datos`.
+- `citas` no tiene `updated_at`: los UPDATE comparan `estado`, `fecha`, `hora` y `abogado_id`.
+- Asistencia no crea ni recibe actividades jurídicas (filtrado en la consulta). El contenido de las actividades no va a la bitácora.
+- Llamada o mensaje (correo = mensaje con canal correo) fija `primera_respuesta_at` con `marcarPrimeraRespuesta`.
+- Avisos solo al personal (nunca al cliente); push solo para la solicitud crítica. Casos reservados: solo Dirección y miembros activos del equipo.
+- `/admin/agenda` (panel admin) cancela con motivo y origen vía `crm_cancelar_cita`; no reactiva citas canceladas ni concluidas.
+- Pendiente: función atómica en la base para reemplazar el horario (hoy se borra e inserta con restauración best-effort).

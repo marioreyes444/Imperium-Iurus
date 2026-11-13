@@ -27,11 +27,22 @@ export const appointmentSchema = z.object({
 
 export type AppointmentFormData = z.infer<typeof appointmentSchema>
 
+/**
+ * PATCH de estado desde el panel admin: solo `pendiente ↔ confirmada`.
+ * Cancelar va por DELETE con motivo y origen (crm_cancelar_cita, R-37); una cita cancelada,
+ * atendida o no asistida no vuelve a estar activa (R-38).
+ */
 export const citaEstadoSchema = z.object({
-  estado: z.enum(['pendiente', 'confirmada', 'cancelada']),
+  estado: z.enum(['pendiente', 'confirmada']),
 })
 
 export type CitaEstado = z.infer<typeof citaEstadoSchema>['estado']
+
+/** Cancelación desde el panel admin: motivo (≥ 5 caracteres) y quién cancela (R-37). */
+export const citaCancelarSchema = z.object({
+  motivo: z.string({ required_error: 'Indica el motivo' }).trim().min(5, 'Mínimo 5 caracteres').max(500, 'Máximo 500 caracteres'),
+  origen: z.enum(['cliente', 'estudio', 'abogado'], { errorMap: () => ({ message: 'Indica quién cancela' }) }),
+})
 
 // ─── Respuestas de API ────────────────────────────────────────────────────────
 

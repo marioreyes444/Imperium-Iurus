@@ -26,6 +26,8 @@ export default async function AdminAgendaPage() {
   const pendientes  = citas.filter((c) => c.estado === 'pendiente').length
   const confirmadas = citas.filter((c) => c.estado === 'confirmada').length
   const canceladas  = citas.filter((c) => c.estado === 'cancelada').length
+  // Estados de la migración M5 (CRM): la cita ya ocurrió.
+  const concluidas  = citas.filter((c) => c.estado === 'atendida' || c.estado === 'no_asistio').length
 
   return (
     <main className="min-h-screen bg-primary px-4 pb-24 pt-10 sm:px-6 lg:px-8">
@@ -43,6 +45,7 @@ export default async function AdminAgendaPage() {
               { label: 'Pendientes',  value: pendientes,  color: 'text-yellow-400' },
               { label: 'Confirmadas', value: confirmadas, color: 'text-emerald-400' },
               { label: 'Canceladas',  value: canceladas,  color: 'text-red-400' },
+              { label: 'Concluidas',  value: concluidas,  color: 'text-sky-400' },
               { label: 'Total',       value: citas.length, color: 'text-gold' },
             ].map((s) => (
               <div key={s.label} className="border border-border bg-card-bg px-5 py-3 text-center">
