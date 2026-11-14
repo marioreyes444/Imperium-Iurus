@@ -10,8 +10,8 @@ Archivos que acompañan a esta especificación (cópialos al repositorio donde s
 
 | Archivo | Destino en el repo | Qué es |
 |---|---|---|
-| `20261112120000_m4_crm.sql` | `supabase/migrations/` | Migración M4: 17 tablas, 1 vista, triggers y funciones del CRM |
-| `20261112120100_m5_crm_citas.sql` | `supabase/migrations/` | Migración M5: cambios a `public.citas` (abogado, duración, sin cruces) |
+| `20261112120000_m4_crm.sql` | `docs/sql/` | Migración M4: 17 tablas, 1 vista, triggers y funciones del CRM |
+| `20261112120100_m5_crm_citas.sql` | `docs/sql/` | Migración M5: cambios a `public.citas` (abogado, duración, sin cruces) |
 | `pruebas_reglas_crm.sql` | `docs/crm/` | 132 pruebas de las reglas de la base. Solo para Postgres local |
 | `CRM_maqueta_listado.html` | `docs/crm/` | Maqueta de referencia del patrón de listado |
 

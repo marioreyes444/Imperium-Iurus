@@ -15,8 +15,8 @@ Sobre un proyecto Supabase **nuevo** (o uno de pruebas que no sea el compartido)
 | 0 | `supabase/migrations/20261009120000_m1_esquema_base.sql`, `…120100_m2_seguridad.sql`, `…120200_m3_realtime_storage.sql` | Esquema base del sitio (citas, consultas, etc.) | Ya existentes |
 | 0 | `docs/sql/push_subscriptions.sql` y los `docs/sql/sql-configuracion-*.sql` | Notificaciones push y claves de `configuracion` | Ya existentes |
 | 1 | **Catálogo E5** (`areas_practica` y `servicios`) | Áreas y servicios activos | **No está en este repositorio**: lo entrega el módulo E5. M4 tiene claves foráneas a estas tablas y no se aplica sin ellas |
-| 2 | `supabase/migrations/20261112120000_m4_crm.sql` | 17 tablas `crm_*`, vista `crm_v_carga_personal`, triggers y funciones | Aborta si falta el catálogo |
-| 3 | `supabase/migrations/20261112120100_m5_crm_citas.sql` | Cambios a `public.citas` (abogado, duración, sin cruces, `crm_cancelar_cita`) | Aborta si M4 no está o si hay citas activas repetidas en la misma fecha y hora |
+| 2 | `docs/sql/20261112120000_m4_crm.sql` | 17 tablas `crm_*`, vista `crm_v_carga_personal`, triggers y funciones | Aborta si falta el catálogo |
+| 3 | `docs/sql/20261112120100_m5_crm_citas.sql` | Cambios a `public.citas` (abogado, duración, sin cruces, `crm_cancelar_cita`) | Aborta si M4 no está o si hay citas activas repetidas en la misma fecha y hora |
 
 Comprobaciones tras aplicar:
 

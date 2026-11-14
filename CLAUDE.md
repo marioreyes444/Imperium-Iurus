@@ -430,7 +430,7 @@ El servidor MCP `noodles` (`pip install noodles`, tools `mcp__noodles__*`) gener
 ## CRM (módulo E6) — Entrega 1: cimientos
 
 Especificación fuente de verdad: `docs/crm/ESPECIFICACION_CRM_E6.md`. Vive en `/admin/crm`.
-Las migraciones M4/M5 (`supabase/migrations/`) las aplica una persona autorizada: el código nunca ejecuta SQL.
+Los SQL de M4 y M5 (`docs/sql/20261112120000_m4_crm.sql` y `docs/sql/20261112120100_m5_crm_citas.sql`; orden: catálogo E5 → M4 → M5) los aplica una persona autorizada: el código nunca ejecuta SQL.
 
 | Pieza | Dónde |
 |-------|-------|
